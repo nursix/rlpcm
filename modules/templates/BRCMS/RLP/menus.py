@@ -40,13 +40,21 @@ class S3MainMenu(default.S3MainMenu):
 
         has_role = auth.s3_has_role
         logged_in = auth.s3_logged_in()
-        labels = current.s3db.br_terminology()
+        #labels = current.s3db.br_terminology()
+
+        settings = current.deployment_settings
+
+        org_registration = lambda i: settings.get_custom("org_registration")
 
         if has_role("EVENT_MANAGER"):
             # Organisation managing events
             menu = [MM("Affected Persons", c="br", f="person"),
                     MM("Current Needs", c="br", f="activities"),
-                    MM("Relief Offers", c="br", f="offers"),
+                    MM("Relief Offers", c="br", f="offers", link=False)(
+                        MM("Current Relief Offers"),
+                        MM("Pending Approvals", vars={"pending": "1"}),
+                        MM("Blocked Entries", vars={"blocked": 1}),
+                        ),
                     ]
         elif has_role("CASE_MANAGER"):
             # Organisation managing cases
@@ -61,6 +69,7 @@ class S3MainMenu(default.S3MainMenu):
         else:
             # Private Citizen
             menu = [MM("Report Need", c="br", f="case_activity"),
+                    MM("Find Relief Offers", c="br", f="offers"),
                     MM("Offer Assistance / Supplies", c="br", f="assistance_offer"),
                     ]
 
@@ -71,11 +80,15 @@ class S3MainMenu(default.S3MainMenu):
                    restrict=["ORG_ADMIN", "ORG_GROUP_ADMIN"],
                    ),
                 MM("Events", c="event", f="event", restrict="EVENT_MANAGER"),
+                MM("Pending Approvals", c="default", f="index", args=["approve_org"],
+                   restrict = "ORG_GROUP_ADMIN",
+                   ),
                 MM("Register", c="default", f="index", link=False,
                    check = not logged_in)(
                     MM("Private Citizen", args=["register"]),
-                    # TODO Enable when implemented
-                    MM("Organisation / Company", args=["register_org"], link=False),
+                    MM("Organisation / Company", args=["register_org"],
+                       check = org_registration,
+                       ),
                     ),
                 ]
 
@@ -195,9 +208,11 @@ class S3OptionsMenu(default.S3OptionsMenu):
 
         f = current.request.function
 
-        has_roles = current.auth.s3_has_roles
+        auth = current.auth
+        is_event_manager = auth.s3_has_role("EVENT_MANAGER")
+        org_role = is_event_manager or auth.s3_has_roles(("CASE_MANAGER", "RELIEF_PROVIDER"))
 
-        if has_roles(("EVENT_MANAGER", "CASE_MANAGER", "RELIEF_PROVIDER")):
+        if org_role:
             # Org Users: separate menus per function
             if f == "person":
                 # Cases
@@ -216,6 +231,10 @@ class S3OptionsMenu(default.S3OptionsMenu):
                             M("Statistics", m="report"),
                             # TODO enable when implemented
                             #M("Map", m="map"),
+                            ),
+                        M("Approval", f="offers", link=False, restrict="EVENT_MANAGER")(
+                            M("Pending Approvals", vars={"pending": "1"}),
+                            M("Blocked Entries", vars={"blocked": 1}),
                             ),
                         M("Administration", link=False, restrict="ADMIN")(
                             M("Assistance Types", f="assistance_type"),

@@ -94,6 +94,9 @@ def config(settings):
 
     settings.cms.hide_index = False
 
+    # Do not send standard welcome emails (using custom function)
+    settings.auth.registration_welcome_email = False
+
     # -------------------------------------------------------------------------
     settings.pr.hide_third_gender = False
     settings.pr.separate_name_fields = 2
@@ -119,8 +122,10 @@ def config(settings):
     #
     settings.org.default_organisation = LSJV
 
+    settings.custom.org_registration = True
+
     # -------------------------------------------------------------------------
-    # TODO Realm Rules
+    # Realm Rules
     #
     def brcms_realm_entity(table, row):
         """
@@ -135,7 +140,6 @@ def config(settings):
         realm_entity = 0
 
         if tablename == "pr_person":
-
             # Client records are owned by the organisation
             # the case is assigned to
             ctable = s3db.br_case
@@ -155,7 +159,6 @@ def config(settings):
                            "pr_contact_emergency",
                            "pr_image",
                            ):
-
             # Inherit from person via PE
             table = s3db.table(tablename)
             ptable = s3db.pr_person
@@ -167,16 +170,16 @@ def config(settings):
             if person:
                 realm_entity = person.realm_entity
 
-        elif tablename in ("br_appointment",
-                           "br_case_activity",
-                           "br_case_language",
+        #elif tablename == "br_case":
+            # Owned by managing organisation (default)
+
+        elif tablename in ("br_case_activity",
                            "br_assistance_measure",
                            "br_note",
                            "pr_group_membership",
                            "pr_person_details",
                            "pr_person_tag",
                            ):
-
             # Inherit from person via person_id
             table = s3db.table(tablename)
             ptable = s3db.pr_person
@@ -188,31 +191,8 @@ def config(settings):
             if person:
                 realm_entity = person.realm_entity
 
-        elif tablename == "br_case_activity_update":
-
-            # Inherit from case activity
-            table = s3db.table(tablename)
-            atable = s3db.br_case_activity
-            query = (table._id == row.id) & \
-                    (atable.id == table.case_activity_id)
-            activity = db(query).select(atable.realm_entity,
-                                        limitby = (0, 1),
-                                        ).first()
-            if activity:
-                realm_entity = activity.realm_entity
-
-        elif tablename == "br_assistance_measure_theme":
-
-            # Inherit from measure
-            table = s3db.table(tablename)
-            mtable = s3db.br_assistance_measure
-            query = (table._id == row.id) & \
-                    (mtable.id == table.measure_id)
-            activity = db(query).select(mtable.realm_entity,
-                                        limitby = (0, 1),
-                                        ).first()
-            if activity:
-                realm_entity = activity.realm_entity
+        #elif tablename == "br_assistance_offer":
+            # Owned by the provider (pe_id, default)
 
         elif tablename == "pr_group":
 
@@ -225,29 +205,9 @@ def config(settings):
             if group and group.group_type == 7:
                 realm_entity = None
 
-        elif tablename == "project_task":
+        #elif tablename == "event_event":
+            # Owned by the lead organisation (default)
 
-            # Inherit the realm entity from the assignee
-            assignee_pe_id = row.pe_id
-            instance_type = s3db.pr_instance_type(assignee_pe_id)
-            if instance_type:
-                table = s3db.table(instance_type)
-                query = table.pe_id == assignee_pe_id
-                assignee = db(query).select(table.realm_entity,
-                                            limitby = (0, 1),
-                                            ).first()
-                if assignee and assignee.realm_entity:
-                    realm_entity = assignee.realm_entity
-
-            # If there is no assignee, or the assignee has no
-            # realm entity, fall back to the user organisation
-            if realm_entity == 0:
-                auth = current.auth
-                user_org_id = auth.user.organisation_id if auth.user else None
-                if user_org_id:
-                    realm_entity = s3db.pr_get_pe_id("org_organisation",
-                                                     user_org_id,
-                                                     )
         return realm_entity
 
     settings.auth.realm_entity = brcms_realm_entity
@@ -380,6 +340,37 @@ def config(settings):
                         )
 
     # -------------------------------------------------------------------------
+    def offer_date_dt_orderby(field, direction, orderby, left_joins):
+        """
+            When sorting offers by date, use created_on to maintain
+            consistent order of multiple offers on the same date
+        """
+
+        sorting = {"table": field.tablename,
+                   "direction": direction,
+                   }
+        orderby.append("%(table)s.date%(direction)s,%(table)s.created_on%(direction)s" % sorting)
+
+    # -------------------------------------------------------------------------
+    def customise_br_assistance_offer_resource(r, tablename):
+
+        s3db = current.s3db
+
+        table = s3db.br_assistance_offer
+
+        s3db.configure("br_assistance_offer",
+                       # Default sort order: newest first
+                       orderby = "br_assistance_offer.date desc, br_assistance_offer.created_on desc",
+                       )
+
+        # Maintain consistent order for multiple assistance offers
+        # on the same day (by enforcing created_on as secondary order criterion)
+        field = table.date
+        field.represent.dt_orderby = offer_date_dt_orderby
+
+    settings.customise_br_assistance_offer_resource = customise_br_assistance_offer_resource
+
+    # -------------------------------------------------------------------------
     def customise_br_assistance_offer_controller(**attr):
 
         db = current.db
@@ -389,7 +380,8 @@ def config(settings):
         s3 = current.response.s3
 
         is_event_manager = auth.s3_has_role("EVENT_MANAGER")
-        org_role = is_event_manager or auth.s3_has_roles(("CASE_MANAGER", "RELIEF_PROVIDER"))
+        is_relief_provider = auth.s3_has_role("RELIEF_PROVIDER")
+        org_role = is_event_manager or is_relief_provider
 
         # Custom prep
         standard_prep = s3.prep
@@ -400,6 +392,17 @@ def config(settings):
             resource = r.resource
             table = resource.table
 
+            from .helpers import get_current_events, \
+                                 get_managed_orgs, \
+                                 ProviderRepresent
+
+            if is_relief_provider:
+                providers = get_managed_orgs("RELIEF_PROVIDER")
+            elif auth.user:
+                providers = [auth.user.pe_id]
+            else:
+                providers = []
+
             # Check perspective
             mine = r.function == "assistance_offer"
             if mine:
@@ -408,9 +411,8 @@ def config(settings):
                 s3.hide_last_update = False
 
                 # Filter for offers of current user
-                pe_id = auth.user.pe_id if auth.user else None
-                if pe_id:
-                    query = (FS("pe_id") == pe_id)
+                if len(providers) == 1:
+                    query = (FS("pe_id") == providers[0])
                 else:
                     query = (FS("pe_id").belongs([]))
                 resource.add_filter(query)
@@ -427,6 +429,8 @@ def config(settings):
 
                 # Restrict data formats
                 allowed = ("html", "iframe", "popup", "aadata", "plain", "geojson", "pdf", "xls")
+                if r.method == "report":
+                    allowed += ("json",)
                 settings.ui.export_formats = ("pdf", "xls")
                 if r.representation not in allowed:
                     r.error(403, current.ERROR.NOT_PERMITTED)
@@ -449,7 +453,6 @@ def config(settings):
 
                 # Default Event
                 field = table.event_id
-                from .helpers import get_current_events
                 events = get_current_events(r.record)
                 if events:
                     dbset = db(s3db.event_event.id.belongs(events))
@@ -461,16 +464,19 @@ def config(settings):
 
                 # Default Provider
                 field = table.pe_id
-                if not org_role:
-                    pe_id = auth.user.pe_id if auth.user else None
-                    if pe_id:
-                        field.default = pe_id
-                        field.readable = field.writable = False
-                elif auth.s3_has_role("RELIEF_PROVIDER"):
-                    # TODO Get managed orgs (offers only made by RELIEF_PROVIDER)
-                    # if one: set org_pe_id
-                    # otherwise: make selectable
-                    pass
+                field.label = T("Provider")
+                field.readable = not mine or org_role
+                field.represent = ProviderRepresent()
+                if len(providers) == 1:
+                    field.default = providers[0]
+                    field.writable = False
+                elif providers:
+                    etable = s3db.pr_pentity
+                    dbset = db(etable.pe_id.belongs(providers))
+                    field.requires = IS_ONE_OF(dbset, "pr_pentity.pe_id",
+                                               field.represent,
+                                               )
+                    field.writable = mine
                 elif is_event_manager:
                     field.writable = False
 
@@ -478,7 +484,7 @@ def config(settings):
                 field = table.location_id
                 requires = field.requires
                 if isinstance(requires, IS_EMPTY_OR):
-                    requires = requires.other
+                    field.requires = requires.other
                 field.widget = S3LocationSelector(levels = ("L1", "L2", "L3", "L4"),
                                                   required_levels = ("L1", "L2", "L3"),
                                                   show_address = False,
@@ -489,9 +495,19 @@ def config(settings):
                 # TODO End date mandatory
                 # => default to 4 weeks from now
 
-                # TODO Contact defaults
-                # - Contact Email => default from user if CITIZEN
-                # - Contact Phone number => default from user if CITIZEN
+                if not is_event_manager:
+                    # Need type is mandatory
+                    field = table.need_id
+                    requires = field.requires
+                    if isinstance(requires, IS_EMPTY_OR):
+                        field.requires = requires.other
+
+                    # At least phone number is required
+                    # - TODO default from user if CITIZEN
+                    field = table.contact_phone
+                    requires = field.requires
+                    if isinstance(requires, IS_EMPTY_OR):
+                        field.requires = requires.other
 
                 field = table.chargeable
                 field.represent = chargeable_warning
@@ -508,7 +524,6 @@ def config(settings):
                                                        }).represent
 
                 # Status only writable for EVENT_MANAGER
-                # TODO default to NEW? or APPROVED?
                 field = table.status
                 field.writable = is_event_manager
                 # Color-coded status representation
@@ -572,18 +587,30 @@ def config(settings):
                                             cols = 3,
                                             ),
                             ])
-                    else:
+
+                    # Visibility Filter
+                    if not mine:
                         # Filter out unavailable or unapproved offers
                         today = current.request.utcnow.date()
-                        query = (FS("availability") == "AVL") & \
-                                (FS("status") == "APR") & \
-                                ((FS("end_date") == None) | (FS("end_date") >= today))
-                        resource.add_filter(query)
+                        vquery = (FS("availability") == "AVL") & \
+                                 (FS("status") == "APR") & \
+                                 ((FS("end_date") == None) | (FS("end_date") >= today))
+                    else:
+                        # Show all accessible
+                        vquery = None
+                    if is_event_manager:
+                        if r.get_vars.get("pending") == "1":
+                            vquery = (FS("status") == "NEW")
+                        elif r.get_vars.get("blocked") == "1":
+                            vquery = (FS("status") == "BLC")
+                    if vquery:
+                        resource.add_filter(vquery)
 
                     # List fields
                     list_fields = ["need_id",
                                    "name",
                                    "chargeable",
+                                   #"pe_id",
                                    "location_id$L3",
                                    "location_id$L2",
                                    "location_id$L1",
@@ -593,6 +620,8 @@ def config(settings):
                                    ]
                     if mine or is_event_manager:
                         list_fields.append("status")
+                    if not mine or org_role:
+                        list_fields.insert(3, "pe_id")
 
                     resource.configure(filter_widgets = filter_widgets,
                                        list_fields = list_fields,
@@ -601,6 +630,7 @@ def config(settings):
                     # Report options
                     if r.method == "report":
                         facts = ((T("Number of Relief Offers"), "count(id)"),
+                                 (T("Number of Providers"), "count(pe_id)"),
                                 )
                         axes = ["need_id",
                                 "location_id$L4",
@@ -609,6 +639,7 @@ def config(settings):
                                 "location_id$L1",
                                 "availability",
                                 "chargeable",
+                                (T("Provider Type"), "pe_id$instance_type"),
                                 ]
                         default_rows = "need_id"
                         default_cols = "location_id$L3"
@@ -633,6 +664,18 @@ def config(settings):
     settings.customise_br_assistance_offer_controller = customise_br_assistance_offer_controller
 
     # -------------------------------------------------------------------------
+    def activity_date_dt_orderby(field, direction, orderby, left_joins):
+        """
+            When sorting activities by date, use created_on to maintain
+            consistent order of multiple activities on the same date
+        """
+
+        sorting = {"table": field.tablename,
+                   "direction": direction,
+                   }
+        orderby.append("%(table)s.date%(direction)s,%(table)s.created_on%(direction)s" % sorting)
+
+    # -------------------------------------------------------------------------
     def customise_br_case_activity_resource(r, tablename):
 
         s3 = current.response.s3
@@ -644,6 +687,9 @@ def config(settings):
         # Can't change start date, always today
         field = table.date
         field.writable = False
+        # Maintain consistent order for multiple activities
+        # on the same day (by enforcing created_on as secondary order criterion)
+        field.represent.dt_orderby = activity_date_dt_orderby
 
         # Need type is mandatory
         field = table.need_id
@@ -678,6 +724,8 @@ def config(settings):
                        }
         s3db.configure("br_case_activity",
                        subheadings = subheadings,
+                       # Default sort order: newest first
+                       orderby = "br_case_activity.date desc, br_case_activity.created_on desc",
                        )
 
         # CRUD Strings
@@ -746,6 +794,8 @@ def config(settings):
 
                 # Restrict data formats
                 allowed = ("html", "iframe", "popup", "aadata", "plain", "geojson", "pdf", "xls")
+                if r.method == "report":
+                    allowed += ("json",)
                 settings.ui.export_formats = ("pdf", "xls")
                 if r.representation not in allowed:
                     r.error(403, current.ERROR.NOT_PERMITTED)
@@ -819,7 +869,6 @@ def config(settings):
 
                 resource.configure(filter_widgets = filter_widgets,
                                    list_fields = list_fields,
-                                   orderby = "br_case_activity.date desc",
                                    )
 
                 # Report options
@@ -859,8 +908,113 @@ def config(settings):
     # TODO customise event_event
 
     # -------------------------------------------------------------------------
-    # TODO customise org_organisation
-    # - have offices and staff, nothing else
+    def customise_org_organisation_controller(**attr):
+
+        s3 = current.response.s3
+
+        # Enable bigtable features
+        settings.base.bigtable = True
+
+        # Custom prep
+        standard_prep = s3.prep
+        def prep(r):
+            # Call standard prep
+            result = standard_prep(r) if callable(standard_prep) else True
+
+            auth = current.auth
+            #s3db = current.s3db
+
+            resource = r.resource
+
+            is_org_group_admin = auth.s3_has_role("ORG_GROUP_ADMIN")
+
+            if not r.component:
+                if r.interactive:
+
+                    from s3 import S3SQLCustomForm, \
+                                   S3SQLInlineComponent, \
+                                   S3SQLInlineLink, \
+                                   S3OptionsFilter, \
+                                   S3TextFilter, \
+                                   s3_get_filter_opts
+
+                    # Custom form
+                    if is_org_group_admin:
+                        types = S3SQLInlineLink("organisation_type",
+                                                field = "organisation_type_id",
+                                                search = False,
+                                                label = T("Type"),
+                                                multiple = settings.get_org_organisation_types_multiple(),
+                                                widget = "multiselect",
+                                                )
+                    else:
+                        types = None
+
+                    crud_fields = ["name",
+                                   "acronym",
+                                   types,
+                                   S3SQLInlineComponent(
+                                        "contact",
+                                        fields = [("", "value")],
+                                        filterby = {"field": "contact_method",
+                                                    "options": "EMAIL",
+                                                    },
+                                        label = T("Email"),
+                                        multiple = False,
+                                        name = "email",
+                                        ),
+                                   "phone",
+                                   "website",
+                                   "logo",
+                                   "comments",
+                                   ]
+
+                    # Filters
+                    text_fields = ["name", "acronym", "website", "phone"]
+                    if is_org_group_admin:
+                        text_fields.append("email.value")
+                    filter_widgets = [S3TextFilter(text_fields,
+                                                   label = T("Search"),
+                                                   ),
+                                      ]
+                    if is_org_group_admin:
+                        filter_widgets.extend([
+                            S3OptionsFilter(
+                                "organisation_type__link.organisation_type_id",
+                                label = T("Type"),
+                                options = lambda: s3_get_filter_opts("org_organisation_type"),
+                                ),
+                            ])
+
+                    resource.configure(crud_form = S3SQLCustomForm(*crud_fields),
+                                       filter_widgets = filter_widgets,
+                                       )
+
+                # Custom list fields
+                list_fields = ["name",
+                               "acronym",
+                               #"organisation_type__link.organisation_type_id",
+                               "website",
+                               "phone",
+                               #"email.value"
+                               ]
+                if is_org_group_admin:
+                    list_fields.insert(2, (T("Type"), "organisation_type__link.organisation_type_id"))
+                    list_fields.append((T("Email"), "email.value"))
+                r.resource.configure(list_fields = list_fields,
+                                     )
+
+            return result
+        s3.prep = prep
+
+        # Custom rheader
+        from .rheaders import rlpcm_org_rheader
+        attr = dict(attr)
+        attr["rheader"] = rlpcm_org_rheader
+
+        return attr
+
+    settings.customise_org_organisation_controller = customise_org_organisation_controller
 
     # -------------------------------------------------------------------------
     def person_onaccept(form):
@@ -895,6 +1049,23 @@ def config(settings):
     def customise_pr_person_resource(r, tablename):
 
         s3db = current.s3db
+
+        # Configure components to inherit realm_entity from
+        # the person record incl. on realm updates
+        s3db.configure("pr_person",
+                       realm_components = ("assistance_measure",
+                                           "case_activity",
+                                           "case_language",
+                                           "address",
+                                           "contact",
+                                           "contact_emergency",
+                                           "group_membership",
+                                           "image",
+                                           "note",
+                                           "person_details",
+                                           "person_tag",
+                                           ),
+                       )
 
         # Custom callback to assign an ID
         s3db.add_custom_callback("pr_person", "onaccept", person_onaccept)
@@ -966,6 +1137,5 @@ def config(settings):
         return attr
 
     settings.customise_pr_person_controller = customise_pr_person_controller
-
 
 # END =========================================================================
