@@ -1860,9 +1860,20 @@ class approve_org(S3CustomController):
                     redirect(URL(c = "default", f = "index", args = ["approve_org"]))
 
                 elif rejected:
-                    user.update_record(registration_key = "rejected")
+                    # Drop the temp record
+                    if temp:
+                        temp.delete_record()
+                    # Mark the user account as rejected and deleted, remove names
+                    user.update_record(first_name = "",
+                                       last_name = "",
+                                       # Keep email to prevent another attempt
+                                       #email = None,
+                                       password = uuid4().hex,
+                                       deleted = True,
+                                       registration_key = "rejected",
+                                       )
                     session.confirmation = T("Registration rejected")
-                    redirect(URL(c="default", f="index", args=["approve"]))
+                    redirect(URL(c="default", f="index", args=["approve_org"]))
 
             output = {"form": form,
                       "title": T("Approve Organization"),
