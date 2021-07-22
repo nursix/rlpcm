@@ -48,23 +48,19 @@ class S3MainMenu(default.S3MainMenu):
 
         if has_role("EVENT_MANAGER"):
             # Organisation managing events
-            menu = [MM("Affected Persons", c="br", f="person"),
-                    MM("Current Needs", c="br", f="activities"),
+            menu = [MM("Current Needs", c="br", f="activities"),
                     MM("Relief Offers", c="br", f="offers", link=False)(
                         MM("Current Relief Offers"),
                         MM("Pending Approvals", vars={"pending": "1"}),
                         MM("Blocked Entries", vars={"blocked": 1}),
                         ),
-                    ]
-        elif has_role("CASE_MANAGER"):
-            # Organisation managing cases
-            menu = [MM("Affected Persons", c="br", f="person"),
-                    MM("Relief Offers", c="br", f="offers"),
+                    MM("Affected Persons", c="br", f="person"),
                     ]
         elif has_role("RELIEF_PROVIDER"):
             # Organisation offering relief services / supplies
             menu = [MM("Current Needs", c="br", f="activities"),
                     MM("Our Relief Offers", c="br", f="assistance_offer"),
+                    MM("Affected Persons", c="br", f="person"),
                     ]
         else:
             # Private Citizen
@@ -86,7 +82,7 @@ class S3MainMenu(default.S3MainMenu):
                 MM("Register", c="default", f="index", link=False,
                    check = not logged_in)(
                     MM("Private Citizen", args=["register"]),
-                    MM("Organisation / Company", args=["register_org"],
+                    MM("Organization", args=["register_org"],
                        check = org_registration,
                        ),
                     ),
@@ -214,12 +210,19 @@ class S3OptionsMenu(default.S3OptionsMenu):
 
         if org_role:
             # Org Users: separate menus per function
-            if f == "person":
+            if f in ("person", "case_activity"):
                 # Cases
                 menu = [M(labels.CURRENT, f="person", vars={"closed": "0"},
-                          restrict=("EVENT_MANAGER", "CASE_MANAGER"))(
+                          restrict=("EVENT_MANAGER", "RELIEF_PROVIDER"))(
                             M(crud_strings.label_create, m="create"),
-                            )
+                            ),
+                        M("Our Needs", f="case_activity", restrict="RELIEF_PROVIDER")(
+                            M("Statistic", m="report"),
+                            ),
+                        M("Archive", link=False)(
+                            M(labels.CLOSED, f="person", vars={"closed": "1"}),
+                            M("Invalid Cases", f="person", vars={"invalid": "1"}, restrict=["ADMIN"]),
+                            ),
                         ]
             elif f in ("assistance_offer", "offers", "assistance_type"):
                 # Relief Offers
