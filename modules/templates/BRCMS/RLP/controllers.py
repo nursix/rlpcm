@@ -1633,7 +1633,8 @@ class approve_org(S3CustomController):
                                                                    "email": user.email,
                                                                    }
             ttable = s3db.auth_user_temp
-            temp = db(ttable.user_id == user_id).select(ttable.custom,
+            temp = db(ttable.user_id == user_id).select(ttable.id,
+                                                        ttable.custom,
                                                         limitby = (0, 1)
                                                         ).first()
             try:
