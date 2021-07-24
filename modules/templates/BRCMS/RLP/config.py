@@ -103,6 +103,7 @@ def config(settings):
                                       "RELIEF_PROVIDER": "RELIEF_PROVIDER",
                                       "MAP_ADMIN": "ADMIN",
                                       }
+
     # -------------------------------------------------------------------------
     settings.pr.hide_third_gender = False
     settings.pr.separate_name_fields = 2
@@ -140,6 +141,20 @@ def config(settings):
     settings.br.case_notes_tab = False
     settings.br.case_photos_tab = False
     settings.br.case_documents_tab = False
+
+    # -------------------------------------------------------------------------
+    # HRM Settings
+    #
+    settings.hrm.record_tab = False
+    settings.hrm.staff_experience = False
+    settings.hrm.teams = False
+    settings.hrm.use_address = False
+    settings.hrm.use_id = False
+    settings.hrm.use_skills = False
+    settings.hrm.use_certificates = False
+    settings.hrm.use_credentials = False
+    settings.hrm.use_description = False
+    settings.hrm.use_trainings = False
 
     # -------------------------------------------------------------------------
     # ORG Settings
@@ -241,6 +256,17 @@ def config(settings):
         return realm_entity
 
     settings.auth.realm_entity = brcms_realm_entity
+
+    # -------------------------------------------------------------------------
+    def overview_stats_update():
+        """
+            Scheduler task to update the data files for the overview page
+        """
+
+        from .helpers import OverviewData
+        OverviewData.update_data()
+
+    settings.tasks.overview_stats_update = overview_stats_update
 
     # -------------------------------------------------------------------------
     def customise_cms_post_resource(r, tablename):
