@@ -452,6 +452,8 @@ def config(settings):
             # Call standard prep
             result = standard_prep(r) if callable(standard_prep) else True
 
+            get_vars = r.get_vars
+
             resource = r.resource
             table = resource.table
 
@@ -488,6 +490,20 @@ def config(settings):
             else:
                 # Adjust list title, hide last update info
                 title_list = T("Current Relief Offers")
+                match = get_vars.get("match") == "1"
+                show_pending = show_blocked = show_all = False
+                if is_event_manager:
+                    if get_vars.get("pending") == "1":
+                        show_pending = True
+                        title_list = T("Pending Approvals")
+                    elif get_vars.get("blocked") == "1":
+                        show_blocked = True
+                        title_list = T("Blocked Entries")
+                    elif get_vars.get("all") == "1":
+                        show_all = True
+                        title_list = T("All Offers")
+                elif match:
+                    title_list = T("Matching Offers")
                 s3.hide_last_update = not is_event_manager
 
                 # Restrict data formats
@@ -602,10 +618,14 @@ def config(settings):
                 # List configuration
                 if not r.record:
 
+                    from .helpers import OfferAvailabilityFilter, \
+                                         get_offer_filters
+
+                    # Apply availability filter
+                    OfferAvailabilityFilter.apply_filter(resource, get_vars)
+
                     # Filter for matching offers?
-                    match = r.get_vars.get("match") == "1"
                     if not mine and match:
-                        from .helpers import get_offer_filters
                         filters = get_offer_filters()
                         if filters:
                             resource.add_filter(filters)
@@ -652,22 +672,32 @@ def config(settings):
                                             cols = 3,
                                             ),
                             ])
+                    if not mine:
+                        # Add availability date range filter for all-offers perspective
+                        filter_widgets.append(
+                            OfferAvailabilityFilter("date",
+                                                    label = T("Available"),
+                                                    hidden = True,
+                                                    ))
 
                     # Visibility Filter
-                    if not mine:
-                        # Filter out unavailable or unapproved offers
+                    if mine:
+                        # Show all accessible
+                        vquery = None
+                    else:
+                        # Filter out unavailable, unapproved and past offers
                         today = current.request.utcnow.date()
                         vquery = (FS("availability") == "AVL") & \
                                  (FS("status") == "APR") & \
                                  ((FS("end_date") == None) | (FS("end_date") >= today))
-                    else:
-                        # Show all accessible
-                        vquery = None
-                    if is_event_manager:
-                        if r.get_vars.get("pending") == "1":
-                            vquery = (FS("status") == "NEW")
-                        elif r.get_vars.get("blocked") == "1":
-                            vquery = (FS("status") == "BLC")
+                        # Event manager can override this with URL options
+                        if is_event_manager:
+                            if show_pending:
+                                vquery = (FS("status") == "NEW")
+                            elif show_blocked:
+                                vquery = (FS("status") == "BLC")
+                            elif show_all:
+                                vquery = None
                     if vquery:
                         resource.add_filter(vquery)
 
@@ -1074,6 +1104,24 @@ def config(settings):
             resource = r.resource
 
             is_org_group_admin = auth.s3_has_role("ORG_GROUP_ADMIN")
+            mine = False
+
+            if not is_org_group_admin:
+
+                if r.get_vars.get("mine") == "1":
+                    mine = True
+                    # Filter to those the user can update
+                    aquery = current.auth.s3_accessible_query("update", "org_organisation")
+                    if aquery:
+                        resource.add_filter(aquery)
+
+                # Restrict data formats
+                allowed = ("html", "iframe", "popup", "aadata", "plain", "geojson", "pdf", "xls")
+                if r.method in ("report", "filter"):
+                    allowed += ("json",)
+                settings.ui.export_formats = ("pdf", "xls")
+                if r.representation not in allowed:
+                    r.error(403, current.ERROR.NOT_PERMITTED)
 
             if not r.component:
                 if r.interactive:
@@ -1117,9 +1165,17 @@ def config(settings):
                                    ]
 
                     # Filters
-                    text_fields = ["name", "acronym", "website", "phone"]
+                    text_fields = ["name",
+                                   "acronym",
+                                   "website",
+                                   "phone",
+                                   ]
                     if is_org_group_admin:
                         text_fields.append("email.value")
+                    if not mine:
+                        text_fields.extend(["office.location_id$L3",
+                                            "office.location_id$L1",
+                                            ])
                     filter_widgets = [S3TextFilter(text_fields,
                                                    label = T("Search"),
                                                    ),
@@ -1139,14 +1195,19 @@ def config(settings):
 
                 # Custom list fields
                 list_fields = ["name",
-                               "acronym",
                                #"organisation_type__link.organisation_type_id",
+                               #"office.location_id$L3",
+                               #"office.location_id$L1",
                                "website",
                                "phone",
                                #"email.value"
                                ]
+                if not mine:
+                    list_fields[1:1] = ("office.location_id$L3",
+                                        "office.location_id$L1",
+                                        )
                 if is_org_group_admin:
-                    list_fields.insert(2, (T("Type"), "organisation_type__link.organisation_type_id"))
+                    list_fields.insert(1, (T("Type"), "organisation_type__link.organisation_type_id"))
                     list_fields.append((T("Email"), "email.value"))
                 r.resource.configure(list_fields = list_fields,
                                      )
