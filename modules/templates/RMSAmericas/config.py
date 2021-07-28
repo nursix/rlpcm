@@ -4054,6 +4054,17 @@ Thank you"""
                               user_org_default_filter,
                               tablename = "project_project")
 
+        if current.request.controller == "inv":
+            # Very simple functionality all that is required
+            # Lead Organisation needs to be an NS (not a branch)
+            ns_only(tablename,
+                    required = True,
+                    branches = False,
+                    # default
+                    #limit_filter_opts = True,
+                    )
+            return attr
+
         # Load standard model
         s3db = current.s3db
         table = s3db[tablename]
@@ -4748,6 +4759,29 @@ Thank you"""
     settings.customise_req_commit_controller = customise_req_commit_controller
 
     # -------------------------------------------------------------------------
+    def customise_req_project_req_resource(r, tablename):
+        """
+            Customise reponse from options.s3json
+        """
+
+        from s3 import IS_ONE_OF, S3Represent
+
+        s3db = current.s3db
+        ptable = s3db.project_project
+
+        project_represent = S3Represent(lookup="project_project", fields=["code"])
+        query = ((ptable.end_date == None) | \
+                 (ptable.end_date > r.utcnow)) & \
+                (ptable.deleted == False)
+        the_set = current.db(query)
+        s3db.req_project_req.project_id.requires = IS_ONE_OF(the_set, "project_project.id",
+                                                             project_represent,
+                                                             sort = True,
+                                                             )
+
+    settings.customise_req_project_req_resource = customise_req_project_req_resource
+
+    # -------------------------------------------------------------------------
     def customise_req_req_resource(r, tablename):
 
         s3db = current.s3db
@@ -4761,6 +4795,48 @@ Thank you"""
                 s3db.req_ref_represent(v, show_link, pdf)
         table.site_id.label = T("Deliver To")
 
+        if r.tablename == tablename:
+            if r.record and \
+               r.record.workflow_status == 3:
+                # Never opens in Component Tab, always breaks out
+                table.approved_by_id.readable = True
+
+            # Link to Projects
+            from s3 import IS_ONE_OF, S3Represent, S3SQLCustomForm
+            from s3layouts import S3PopupLink
+            ptable= s3db.project_project
+            f = s3db.req_project_req.project_id
+            f.label = T("Project Code")
+            project_represent = S3Represent(lookup="project_project", fields=["code"])
+            query = ((ptable.end_date == None) | \
+                     (ptable.end_date > r.utcnow)) & \
+                    (ptable.deleted == False)
+            the_set = current.db(query)
+            f.requires = IS_ONE_OF(the_set, "project_project.id",
+                                   project_represent,
+                                   sort = True,
+                                   )
+            f.comment = S3PopupLink(c = "inv",
+                                    f = "project",
+                                    label = T("Create Project"),
+                                    tooltip = T("If you don't see the project in the list, you can add a new one by clicking link 'Create Project'."),
+                                    vars = {"caller": "req_req_sub_project_req_project_id",
+                                            "parent": "project_req",
+                                            },
+                                    ),
+            crud_fields = [f for f in table.fields if table[f].readable]
+            crud_fields.insert(0, "project_req.project_id")
+            crud_form = S3SQLCustomForm(*crud_fields)
+            s3db.configure(tablename,
+                           crud_form = crud_form,
+                           )
+
+            # Custom Request Form
+            s3db.set_method("req", "req",
+                            method = "form",
+                            action = PrintableShipmentForm,
+                            )
+
         # Hide Drivers list_field
         list_fields = s3db.get_config("req_req", "list_fields")
         try:
@@ -4768,15 +4844,6 @@ Thank you"""
         except ValueError:
             # Already removed
             pass
-
-        if r.record and r.record.workflow_status == 3:
-            table.approved_by_id.readable = True
-
-        # Custom Request Form
-        s3db.set_method("req", "req",
-                        method = "form",
-                        action = PrintableShipmentForm,
-                        )
 
     settings.customise_req_req_resource = customise_req_req_resource
 
