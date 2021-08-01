@@ -51,6 +51,7 @@ __all__ = ("RequestPriorityStatusModel",
            "RequestProjectModel",
            "RequestTagModel",
            "RequestTaskModel",
+           "RequestRequesterCategoryModel",
            "CommitModel",
            "CommitItemModel",
            "CommitPersonModel",
@@ -315,7 +316,8 @@ class RequestModel(S3Model):
         if use_workflow:
             workflow_default = 1 # Draft
         else:
-            workflow_default = 3 # Approved
+            # Don't make assumptions
+            workflow_default = None
 
         # ---------------------------------------------------------------------
         # Request Reference
@@ -1898,7 +1900,19 @@ class RequestApproverModel(S3Model):
                                           # @ToDo: Widget
                                           #widget = S3PentityWidget(),
                                           ),
+                          Field("title", # 'position' is a Reserved word in SQL
+                                label = T("Position"),
+                                ),
                           self.pr_person_id(),
+                          Field("matcher", "boolean",
+                                default = False,
+                                label = T("Matcher"),
+                                represent = s3_yes_no_represent,
+                                comment = DIV(_class = "tooltip",
+                                              _title = "%s|%s" % (T("Matcher"),
+                                                                  T("Is this person the one to match request items to specific warehouses &/or purchase them."),
+                                                                  ))
+                                ),
                           s3_comments(),
                           *s3_meta_fields(),
                           )
@@ -3976,6 +3990,45 @@ class RequestTaskModel(S3Model):
         return {}
 
 # =============================================================================
+class RequestRequesterCategoryModel(S3Model):
+    """
+        Model to control which types of requester can request which items
+        - used by RLPPTM
+    """
+
+    names = ("req_requester_category",
+             )
+
+    def model(self):
+
+        # -----------------------------------------------------------------
+        # Link supply item categories to requester attributes (e.g. org type)
+        #
+        tablename = "req_requester_category"
+        self.define_table(tablename,
+                          self.supply_item_category_id(
+                              empty = False,
+                              ondelete = "CASCADE",
+                              ),
+                          self.org_organisation_type_id(
+                              empty = False,
+                              ondelete = "CASCADE",
+                              ),
+                          *s3_meta_fields())
+
+        self.configure(tablename,
+                       deduplicate = S3Duplicate(primary = ("item_category_id",
+                                                            "organisation_type_id",
+                                                            ),
+                                                 ),
+                       )
+
+        # ---------------------------------------------------------------------
+        # Pass names back to global scope (s3.*)
+        #
+        return {}
+
+# =============================================================================
 class CommitModel(S3Model):
     """
         Model for commits (pledges)
@@ -5189,7 +5242,7 @@ def req_rheader(r, check_page=False):
 
         if site_id:
             stable = s3db.org_site
-        if workflow_status in (1, 2, 5): # Draft/Submitted/Cancelled
+        if use_workflow and workflow_status in (1, 2, 5): # Draft/Submitted/Cancelled
             transit_status = ("",)
         elif settings.get_req_show_quantity_transit() and not is_template:
             transit_status = s3db.req_status_opts.get(record.transit_status,
@@ -5247,7 +5300,7 @@ def req_rheader(r, check_page=False):
             row1 = ""
             row3 = ""
         else:
-            if workflow_status in (1, 2, 5): # Draft/Submitted/Cancelled
+            if use_workflow and workflow_status in (1, 2, 5): # Draft/Submitted/Cancelled
                 row1_status = (TH("%s: " % table.workflow_status.label),
                                table.workflow_status.represent(workflow_status),
                                )
