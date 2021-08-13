@@ -539,16 +539,18 @@ class S3Report(S3Method):
             # Generate the report form
             ajax_vars = Storage(r.get_vars)
             ajax_vars.update(get_vars)
-            filter_form = attr.get("filter_form", None)
-            filter_tab = attr.get("filter_tab", None)
+            attr_get = attr.get
+            filter_form = attr_get("filter_form", None)
+            filter_tab = attr_get("filter_tab", None)
             filter_url = r.url(method = "",
                                representation = "",
                                vars = ajax_vars.fromkeys((k for k in ajax_vars
                                                           if k not in report_vars)),
                                )
-            ajaxurl = attr.get("ajaxurl", r.url(method="report",
-                                                representation="json",
-                                                vars=ajax_vars))
+            ajaxurl = attr_get("ajaxurl", r.url(method = "report",
+                                                representation = "json",
+                                                vars = ajax_vars
+                                                ))
             output = S3ReportForm(resource).html(pivotdata,
                                                  get_vars = get_vars,
                                                  filter_widgets = None,
@@ -556,7 +558,8 @@ class S3Report(S3Method):
                                                  filter_url = filter_url,
                                                  filter_form = filter_form,
                                                  filter_tab = filter_tab,
-                                                 widget_id = widget_id)
+                                                 widget_id = widget_id
+                                                 )
 
             # Detect and store theme-specific inner layout
             view = self._view(r, "pivottable.html")
@@ -1736,7 +1739,7 @@ class S3PivotTable(object):
             @param strict: filter out dimension values which don't match
                            the resource filter
             @param precision: maximum precision of aggregate computations,
-                              a dict {selector:number_of_decimals}
+                              a dict {selector: number_of_decimals}
         """
 
         # Initialize ----------------------------------------------------------
@@ -2431,10 +2434,10 @@ class S3PivotTable(object):
             # Get the representation method
             has_fk = f is not None and s3_has_foreign_key(f)
             if has_fk:
-                represent = lambda v, f=f: s3_str(f.represent(v))
+                represent = lambda v, field=f: s3_str(field.represent(v))
             else:
-                m = self._represent_method(selector)
-                represent = lambda v, m=m: s3_str(m(v))
+                reprmethod = self._represent_method(selector)
+                represent = lambda v, m=reprmethod: s3_str(m(v))
 
             represents[selector] = represent
 
@@ -2524,7 +2527,7 @@ class S3PivotTable(object):
                 return (keys, totals[0], totals)
         except (TypeError, ValueError):
             pass
-        return (None, None)
+        return (None, None, None)
 
     # -------------------------------------------------------------------------
     @staticmethod

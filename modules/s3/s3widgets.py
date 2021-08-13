@@ -3630,17 +3630,17 @@ class S3GroupedOptionsWidget(FormWidget):
     """
 
     def __init__(self,
-                 options=None,
-                 multiple=True,
-                 size=None,
-                 cols=None,
-                 help_field=None,
-                 none=None,
-                 sort=True,
-                 orientation=None,
-                 table=True,
-                 no_opts=None,
-                 option_comment=None,
+                 options = None,
+                 multiple = True,
+                 size = None,
+                 cols = None,
+                 help_field = None,
+                 none = None,
+                 sort = True,
+                 orientation = None,
+                 table = True,
+                 no_opts = None,
+                 option_comment = None,
                  ):
         """
             Constructor
@@ -3660,7 +3660,7 @@ class S3GroupedOptionsWidget(FormWidget):
             @param orientation: the ordering orientation, "columns"|"rows"
             @param table: whether to render options inside a table or not
             @param no_opts: text to show if no options available
-            @param comment: HTML template to render after the LABELs
+            @param option_comment: HTML template to render after the LABELs
         """
 
         self.options = options
@@ -3959,11 +3959,12 @@ class S3RadioOptionsWidget(FormWidget):
     """
 
     def __init__(self,
-                 options=None,
-                 cols=None,
-                 help_field=None,
-                 none=None,
-                 sort=True):
+                 options = None,
+                 cols = None,
+                 help_field = None,
+                 none = None,
+                 sort = True
+                 ):
         """
             Constructor
 
@@ -4008,10 +4009,12 @@ class S3RadioOptionsWidget(FormWidget):
         options = self._options(field, value)
         if "empty" in options:
             widget = DIV(SPAN(options["empty"],
-                              _class="no-options-available"),
-                         INPUT(_type="hidden",
-                               _name=fieldname,
-                               _value=None),
+                              _class = "no-options-available",
+                              ),
+                         INPUT(_type = "hidden",
+                               _name = fieldname,
+                               _value = None,
+                               ),
                          **attr)
         else:
             widget = DIV(**attr)
@@ -8940,10 +8943,13 @@ class CheckboxesWidgetS3(OptionsWidget):
         if totals == 0:
             T = current.T
             opts.append(TR(TD(SPAN(T("no options available"),
-                                   _class="no-options-available"),
-                              INPUT(_name=field.name,
-                                    _class="hide",
-                                    _value=None))))
+                                   _class = "no-options-available",
+                                   ),
+                              INPUT(_name = field.name,
+                                    _class = "hide",
+                                    _value = None,
+                                    )
+                              )))
 
         for r_index in range(rows):
             tds = []
@@ -8957,16 +8963,17 @@ class CheckboxesWidgetS3(OptionsWidget):
                     # Don't provide empty client-side popups
                     label = LABEL(v, _for=input_id)
 
-                tds.append(TD(INPUT(_type="checkbox",
-                                    _name=field.name,
-                                    _id=input_id,
+                tds.append(TD(INPUT(_type = "checkbox",
+                                    _name = field.name,
+                                    _id = input_id,
                                     # Hide checkboxes without a label
-                                    _class="" if v else "hide",
-                                    requires=attr.get("requires", None),
-                                    hideerror=True,
-                                    _value=k,
-                                    value=(str(k) in values)),
-                              label))
+                                    _class = "" if v else "hide",
+                                    requires = attr.get("requires", None),
+                                    hideerror = True,
+                                    _value = k,
+                                    value = (str(k) in values)),
+                              label,
+                              ))
 
                 input_index += 1
             opts.append(TR(tds))
@@ -9643,6 +9650,8 @@ class ICON(I):
             "administration": "fa-cog",
             "alert": "fa-bell",
             "arrow-down": "fa-arrow-down",
+            "arrow-left": "fa-arrow-left",
+            "arrow-right": "fa-arrow-right",
             "assessment": "fa-bar-chart",
             "asset": "fa-fire-extinguisher",
             "attachment": "fa-paperclip",
@@ -9655,6 +9664,8 @@ class ICON(I):
             "calendar": "fa-calendar",
             "caret-right": "fa-caret-right",
             "certificate": "fa-certificate",
+            "check": "fa-check",
+            "close": "fa-close",
             "cog": "fa-cog",
             "comment-alt": "fa-comment-o",
             "commit": "fa-check-square-o",
@@ -9686,6 +9697,7 @@ class ICON(I):
             "globe": "fa-globe",
             "goods": "fa-cubes",
             "group": "fa-group",
+            "hand-grab": "fa-hand-grab-o",
             "hashtag": "fa-hashtag",
             "hint": "fa-hand-o-right",
             "home": "fa-home",
@@ -9711,6 +9723,7 @@ class ICON(I):
             "pencil": "fa-pencil",
             "phone": "fa-phone",
             "picture": "fa-picture-o",
+            "plane": "fa-plane",
             "play": "fa-play",
             "plus": "fa-plus",
             "plus-sign": "fa-plus-sign",
@@ -9729,6 +9742,7 @@ class ICON(I):
             "sent": "fa-check",
             "settings": "fa-wrench",
             "share": "fa-share-alt",
+            "ship": "fa-ship",
             "shipment": "fa-truck",
             "site": "fa-home",
             "skype": "fa-skype",

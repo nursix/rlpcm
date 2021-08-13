@@ -97,6 +97,8 @@ from ..s3 import *
 from s3compat import BytesIO, xrange
 from s3layouts import S3PopupLink
 
+from .req import req_timeframe
+
 # Compact JSON encoding
 SEPARATORS = (",", ":")
 
@@ -397,7 +399,7 @@ class S3ProjectModel(S3Model):
             cappend(S3SQLInlineLink("hazard",
                                     label = T("Hazards"),
                                     field = "hazard_id",
-                                    help_field = self.project_hazard_help_fields,
+                                    help_field = project_hazard_help_fields,
                                     cols = 4,
                                     translate = True,
                                     ))
@@ -409,7 +411,7 @@ class S3ProjectModel(S3Model):
             cappend(S3SQLInlineLink("theme",
                                     label = T("Themes"),
                                     field = "theme_id",
-                                    help_field = self.project_theme_help_fields,
+                                    help_field = project_theme_help_fields,
                                     cols = 4,
                                     translate = True,
                                     # Filter Theme by Sector
@@ -433,7 +435,7 @@ class S3ProjectModel(S3Model):
             rappend("sum(total_organisation_amount)")
             rappend("avg(total_organisation_amount)")
         if budget_monitoring:
-            # @ToDo: Add the defaulting from RMSAmericas/config.py
+            # @ToDo: Add the defaulting from RMS/config.py
             #cappend(S3SQLInlineComponent("budget",
             #                             label = T("Budget"),
             #                             #link = False,
@@ -740,11 +742,7 @@ class S3ProjectModel(S3Model):
     def defaults():
         """ Safe defaults for model-global names if module is disabled """
 
-        dummy = S3ReusableField("dummy_id", "integer",
-                                readable = False,
-                                writable = False)
-
-        return {"project_project_id": lambda **attr: dummy("project_id"),
+        return {"project_project_id": S3ReusableField.dummy("project_id"),
                 }
 
     # -------------------------------------------------------------------------
@@ -1571,11 +1569,7 @@ class S3ProjectActivityModel(S3Model):
     def defaults():
         """ Safe defaults for model-global names if module is disabled """
 
-        dummy = S3ReusableField("dummy_id", "integer",
-                                readable = False,
-                                writable = False)
-
-        return {"project_activity_id": lambda **attr: dummy("activity_id"),
+        return {"project_activity_id": S3ReusableField.dummy("activity_id"),
                 }
 
     # ---------------------------------------------------------------------
@@ -2080,7 +2074,7 @@ class S3ProjectActivityDemographicsModel(S3Model):
                                           empty = False,
                                           comment = parameter_id_comment,
                                           ),
-                          self.req_timeframe(),
+                          req_timeframe()(),
                           Field("target_value", "integer",
                                 label = T("Target Value"),
                                 represent = IS_INT_AMOUNT.represent,
@@ -2143,7 +2137,7 @@ $.filterOptionsS3({
                                               widget = None,
                                               ),
                           self.supply_item_pack_id(),
-                          self.req_timeframe(),
+                          req_timeframe()(),
                           Field("target_value", "integer",
                                 label = T("Target Value"),
                                 represent = IS_INT_AMOUNT.represent,
@@ -4026,12 +4020,7 @@ class S3ProjectLocationModel(S3Model):
     def defaults():
         """ Safe defaults for model-global names if module is disabled """
 
-        dummy = S3ReusableField("dummy_id", "integer",
-                                readable = False,
-                                writable = False,
-                                )
-
-        return {"project_location_id": lambda **attr: dummy("project_location_id"),
+        return {"project_location_id": S3ReusableField.dummy("project_location_id"),
                 "project_location_represent": lambda v, row=None: "",
                 }
 
@@ -5236,7 +5225,7 @@ class S3ProjectPlanningModel(S3Model):
                      indicator_id(readable = False,
                                   writable = False,
                                   ),
-                     # Used as linktable for RMSAmericas HNRC for their UI
+                     # Used as linktable for RMS HNRC for their UI
                      indicator_activity_id(),
                      # Populated Automatically
                      # Used for Timeplot &, in future, to ease changing the monitoring frequency
@@ -9951,11 +9940,7 @@ class S3ProjectProgrammeModel(S3Model):
     def defaults():
         """ Safe defaults for names if module is disabled """
 
-        dummy = S3ReusableField("dummy_id", "integer",
-                                readable = False,
-                                writable = False)
-
-        return {"project_programme_id": lambda **attr: dummy("programme_id"),
+        return {"project_programme_id": S3ReusableField.dummy("programme_id"),
                 }
 
 # =============================================================================
@@ -10098,12 +10083,7 @@ class S3ProjectStatusModel(S3Model):
             Safe defaults for model-global names in case module is disabled
         """
 
-        dummy = S3ReusableField("dummy", "string",
-                                readable = False,
-                                writable = False,
-                                )
-
-        return {"project_status_id": lambda **attr: dummy("status_id"),
+        return {"project_status_id": S3ReusableField.dummy("status_id"),
                 }
 
 # =============================================================================
@@ -10179,11 +10159,7 @@ class S3ProjectStrategyModel(S3Model):
     def defaults():
         """ Safe defaults for model-global names if module is disabled """
 
-        dummy = S3ReusableField("dummy_id", "integer",
-                                readable = False,
-                                writable = False)
-
-        return {"project_strategy_id": lambda **attr: dummy("strategy_id"),
+        return {"project_strategy_id": S3ReusableField.dummy("strategy_id"),
                 }
 
 # =============================================================================
@@ -11694,11 +11670,7 @@ class S3ProjectTaskModel(S3Model):
     def defaults():
         """ Safe defaults for model-global names if module is disabled """
 
-        dummy = S3ReusableField("dummy_id", "integer",
-                                readable = False,
-                                writable = False)
-
-        return {"project_task_id": lambda **attr: dummy("task_id"),
+        return {"project_task_id": S3ReusableField.dummy("task_id"),
                 "project_task_active_statuses": [],
                 }
 

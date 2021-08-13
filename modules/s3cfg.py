@@ -1964,7 +1964,7 @@ class S3Config(Storage):
             e.g. Apellido Paterno in Hispanic names
 
             Setting this means that auth_user.last_name matches with pr_person.middle_name
-            e.g. RMSAmericas
+            e.g. RMS
         """
         return self.__lazy("L10n", "mandatory_middlename", False)
 
@@ -5203,6 +5203,12 @@ class S3Config(Storage):
         """
         return self.org.get("site_last_contacted", False)
 
+    #def get_org_site_show_type(self):
+    #    """
+    #        Whether to show the Type of Sites in Represents
+    #    """
+    #    return self.org.get("site_show_type", True)
+
     def get_org_site_volunteers(self):
         """
             Whether volunteers can be assigned to Sites
@@ -5982,6 +5988,9 @@ class S3Config(Storage):
             To restrict adding new commits to the Completed commits.
         """
         return self.req.get("req_restrict_on_complete", False)
+
+    def get_req_order_item(self):
+        return self.req.get("order_item", False)
 
     def get_req_workflow(self):
         """

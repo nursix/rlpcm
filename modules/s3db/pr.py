@@ -33,6 +33,7 @@ __all__ = (# PR Base Entities
            "PRPersonRelationModel",
            "PRGroupModel",
            "PRForumModel",
+           "PRRealmModel",
 
            # Person Entity Components
            "PRAddressModel",
@@ -96,7 +97,7 @@ __all__ = (# PR Base Entities
            "pr_add_to_role",
            "pr_remove_from_role",
            "pr_instance_type",
-           "pr_realm",
+           "pr_default_realms",
            "pr_realm_users",
            "pr_get_role_paths",
            "pr_get_role_branches",
@@ -112,8 +113,10 @@ __all__ = (# PR Base Entities
            "pr_image_modify",
 
            # Other functions
+           "pr_address_anonymise",
            "pr_availability_filter",
            "pr_import_prep",
+           "pr_person_obscure_dob",
 
            # Data List Default Layouts
            #"pr_address_list_layout",
@@ -207,6 +210,7 @@ class PRPersonEntityModel(S3Model):
                            pr_person = T("Person"),
                            pr_forum = T("Forum"),
                            pr_group = T("Group"),
+                           pr_realm = T("Realm"),
                            )
 
         pr_pentity_represent = pr_PersonEntityRepresent()
@@ -750,7 +754,6 @@ class PRPersonModel(S3Model):
              "pr_gender_opts",
              "pr_person_id",
              "pr_person_lookup",
-             "pr_person_obscure_dob",
              "pr_person_represent",
              )
 
@@ -1282,7 +1285,6 @@ class PRPersonModel(S3Model):
                 "pr_gender_opts": pr_gender_opts,
                 "pr_person_id": person_id,
                 "pr_person_lookup": self.pr_person_lookup,
-                "pr_person_obscure_dob": self.pr_person_obscure_dob,
                 "pr_person_represent": person_represent,
                 }
 
@@ -1350,26 +1352,6 @@ class PRPersonModel(S3Model):
         else:
             return None
 
-    # -----------------------------------------------------------------------------
-    @staticmethod
-    def pr_person_obscure_dob(record_id, field, value):
-        """
-            Helper to obscure a date of birth; maps to the first day of
-            the quarter, thus retaining the approximate age for statistics
-
-            @param record_id: the record ID
-            @param field: the Field
-            @param value: the field value
-
-            @return: the new field value
-        """
-
-        if value:
-            month = int((value.month - 1) / 3) * 3 + 1
-            value = value.replace(month=month, day=1)
-
-        return value
-
     # -------------------------------------------------------------------------
     @staticmethod
     def pr_person_onaccept(form):
@@ -1404,7 +1386,7 @@ class PRPersonModel(S3Model):
             last_name = form_vars_get("last_name")
             middle_as_last = current.deployment_settings.get_L10n_mandatory_middlename()
             if middle_as_last:
-                # RMSAmericas: Map the Person's middle_name to the User's last_name
+                # RMS: Map the Person's middle_name to the User's last_name
                 if first_name and \
                    (user.first_name != first_name or \
                    user.last_name != middle_name):
@@ -3203,14 +3185,11 @@ class PRGroupModel(S3Model):
             that of the person
         """
 
-        db = current.db
-        s3db = current.s3db
-
         # Find the Group
-        gtable = s3db.pr_group
-        group = db(gtable.id == row.group_id).select(gtable.realm_entity,
-                                                     limitby = (0, 1),
-                                                     ).first()
+        gtable = current.s3db.pr_group
+        group = current.db(gtable.id == row.group_id).select(gtable.realm_entity,
+                                                             limitby = (0, 1),
+                                                             ).first()
         try:
             return group.realm_entity
         except AttributeError:
@@ -3722,11 +3701,49 @@ class PRForumModel(S3Model):
         redirect(URL(args=None))
 
 # =============================================================================
+class PRRealmModel(S3Model):
+    """
+        Realms
+        - used to be able to share data across multiple realms
+            - records have this as the realm_entity
+            - entities which need access are affiliated as OU parents
+        - used by RMS
+
+        @ToDo: UI to be able to manage permissions for individual records
+    """
+
+    names = ("pr_realm",
+             )
+
+    def model(self):
+
+        tablename = "pr_realm"
+        self.define_table(tablename,
+                          # Instances
+                          self.super_link("pe_id", "pr_pentity"),
+                          Field("name",
+                                #label = current.T("Name"),
+                                requires = IS_NOT_EMPTY(),
+                                ),
+                          s3_comments(),
+                          *s3_meta_fields())
+
+        # Resource configuration
+        self.configure(tablename,
+                       deduplicate = S3Duplicate(),
+                       super_entity = ("pr_pentity"),
+                       )
+
+        # ---------------------------------------------------------------------
+        # Pass names back to global scope (s3.*)
+        #
+        return {}
+
+# =============================================================================
 class PRAddressModel(S3Model):
     """ Addresses for Person Entities: Persons and Organisations """
 
     names = ("pr_address",
-             "pr_address_anonymise",
              "pr_address_type_opts"
              )
 
@@ -3826,58 +3843,7 @@ class PRAddressModel(S3Model):
         # Pass names back to global scope (s3.*)
         #
         return {"pr_address_type_opts": pr_address_type_opts,
-                "pr_address_anonymise": self.pr_address_anonymise,
                 }
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def pr_address_anonymise(record_id, field, value):
-        """
-            Helper to anonymize a pr_address location; removes street and
-            postcode details, but retains Lx ancestry for statistics
-
-            @param record_id: the pr_address record ID
-            @param field: the location_id Field
-            @param value: the location_id
-
-            @return: the location_id
-
-            Use like this in anonymise rules:
-            ("pr_address", {"key": "pe_id",
-                            "match": "pe_id",
-                            "fields": {"location_id": s3db.pr_address_anonymise,
-                                       "comments": "remove",
-                                       },
-                            }),
-        """
-
-        db = current.db
-        s3db = current.s3db
-
-        # Get the location
-        if value:
-            ltable = s3db.gis_location
-            row = db(ltable.id == value).select(ltable.id,
-                                                ltable.level,
-                                                limitby = (0, 1),
-                                                ).first()
-            if not row.level:
-                # Specific location => remove address details
-                data = {"addr_street": None,
-                        "addr_postcode": None,
-                        "gis_feature_type": 0,
-                        "lat": None,
-                        "lon": None,
-                        "wkt": None,
-                        }
-                # Doesn't work - PyDAL doesn't detect the None value:
-                #if "the_geom" in ltable.fields:
-                #    data["the_geom"] = None
-                row.update_record(**data)
-                if "the_geom" in ltable.fields:
-                    db.executesql("UPDATE gis_location SET the_geom=NULL WHERE id=%s" % row.id)
-
-        return value
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -9261,8 +9227,8 @@ def pr_human_resource_update_affiliations(person_id):
     r = rtable._tablename
     #e = etable._tablename
 
-    # Get the PE-ID for this person
-    pe_id = s3db.pr_get_pe_id("pr_person", person_id)
+    # Get the PE ID for this person
+    pe_id = pr_get_pe_id("pr_person", person_id)
 
     # Get all current HR records
     query = (htable.person_id == person_id) & \
@@ -9290,9 +9256,9 @@ def pr_human_resource_update_affiliations(person_id):
             if site_id and site_id not in sites:
                 itable = s3db.table(row[s].instance_type, None)
                 if itable and "pe_id" in itable.fields:
-                    q = itable.site_id == site_id
-                    site = db(q).select(itable.pe_id,
-                                        limitby=(0, 1)).first()
+                    site = db(itable.site_id == site_id).select(itable.pe_id,
+                                                                limitby = (0, 1)
+                                                                ).first()
                     if site:
                         site_pe_id = sites[site_id] = site.pe_id
             else:
@@ -9316,15 +9282,18 @@ def pr_human_resource_update_affiliations(person_id):
             (rtable.role.belongs((STAFF, VOLUNTEER))) & \
             (etable.pe_id == rtable.pe_id) & \
             (etable.instance_type.belongs((o, s)))
-    affiliations = db(query).select(rtable.id,
+    affiliations = db(query).select(#rtable.id,
                                     rtable.pe_id,
                                     rtable.role,
-                                    etable.instance_type)
+                                    #etable.instance_type
+                                    )
 
     # Remove all affiliations which are not in masters
     for a in affiliations:
-        pe = a[r].pe_id
-        role = a[r].role
+        #pe = a[r].pe_id
+        #role = a[r].role
+        pe = a.pe_id
+        role = a.role
         if role in masters:
             if pe not in masters[role]:
                 pr_remove_affiliation(pe, pe_id, role=role)
@@ -9348,9 +9317,9 @@ def pr_add_affiliation(master, affiliate, role=None, role_type=OU):
     """
         Add a new affiliation record
 
-        @param master: the master entity, either as PE-ID or as tuple
+        @param master: the master entity, either as PE ID or as tuple
                        (instance_type, instance_id)
-        @param affiliate: the affiliated entity, either as PE-ID or as tuple
+        @param affiliate: the affiliated entity, either as PE ID or as tuple
                           (instance_type, instance_id)
         @param role: the role to add the affiliate to (will be created if it
                      doesn't yet exist)
@@ -9370,7 +9339,8 @@ def pr_add_affiliation(master, affiliate, role=None, role_type=OU):
                 (rtable.role == role) & \
                 (rtable.deleted != True)
         row = current.db(query).select(rtable.id,
-                                       limitby=(0, 1)).first()
+                                       limitby = (0, 1)
+                                       ).first()
         if not row:
             data = {"pe_id": master_pe,
                     "role": role,
@@ -9424,13 +9394,13 @@ def pr_remove_affiliation(master, affiliate, role=None):
 #
 def pr_get_pe_id(entity, record_id=None):
     """
-        Get the PE-ID of an instance record
+        Get the PE ID of an instance record
 
         @param entity: the entity, either a tablename, a tuple (tablename,
-                       record_id), a Row of the instance type, or a PE-ID
+                       record_id), a Row of the instance type, or a PE ID
         @param record_id: the record ID, if entity is a tablename
 
-        @return: the PE-ID
+        @return: the PE ID
     """
 
     s3db = current.s3db
@@ -9457,15 +9427,18 @@ def pr_get_pe_id(entity, record_id=None):
     if table:
         db = current.db
         if "pe_id" in table.fields and _id:
-            record = db(table._id==_id).select(table.pe_id,
-                                               limitby=(0, 1)).first()
+            record = db(table._id == _id).select(table.pe_id,
+                                                 limitby = (0, 1)
+                                                 ).first()
         elif _id:
             key = table._id.name
             if key == "pe_id":
                 return _id
             if key != "id" and "instance_type" in table.fields:
-                s = db(table._id==_id).select(table.instance_type,
-                                              limitby=(0, 1)).first()
+                # PE ID is in the instance, not the super entity
+                s = db(table._id == _id).select(table.instance_type,
+                                                limitby = (0, 1)
+                                                ).first()
             else:
                 return None
             if not s:
@@ -9473,7 +9446,8 @@ def pr_get_pe_id(entity, record_id=None):
             table = s3db.table(s.instance_type, None)
             if table and "pe_id" in table.fields:
                 record = db(table[key] == _id).select(table.pe_id,
-                                                      limitby=(0, 1)).first()
+                                                      limitby = (0, 1)
+                                                      ).first()
             else:
                 return None
     if record:
@@ -9763,7 +9737,7 @@ def pr_get_ancestors(pe_id):
 
         @param pe_id: the person entity ID
 
-        @return: a list of PE-IDs
+        @return: a list of PE IDs
     """
 
     s3db = current.s3db
@@ -9811,9 +9785,9 @@ def pr_instance_type(pe_id):
     return None
 
 # =============================================================================
-def pr_realm(entity):
+def pr_default_realms(entity):
     """
-        Get the default realm (=the immediate OU ancestors) of an entity
+        Get the default realm(s) (=the immediate OU ancestors) of an entity
 
         @param entity: the entity (pe_id)
     """
@@ -9830,8 +9804,8 @@ def pr_realm(entity):
             (rtable.deleted != True) & \
             (rtable.role_type == OU)
     rows = current.db(query).select(rtable.pe_id)
-    realm = [row.pe_id for row in rows]
-    return realm
+    realms = [row.pe_id for row in rows]
+    return realms
 
 # =============================================================================
 def pr_realm_users(realm, roles=None, role_types=OU):
@@ -9887,9 +9861,9 @@ def pr_ancestors(entities):
         Find all ancestor entities of the given entities in the
         OU hierarchy.
 
-        @param entities:
+        @param entities: List of PE IDs
 
-        @return: Storage of lists of PE-IDs
+        @return: Storage of lists of PE IDs
     """
 
     if not entities:
@@ -10265,6 +10239,74 @@ def pr_image_modify(image_file,
         return True
     else:
         return False
+
+# =============================================================================
+def pr_address_anonymise(record_id, field, value):
+    """
+        Helper to anonymize a pr_address location; removes street and
+        postcode details, but retains Lx ancestry for statistics
+
+        @param record_id: the pr_address record ID
+        @param field: the location_id Field
+        @param value: the location_id
+
+        @return: the location_id
+
+        Use like this in anonymise rules:
+        ("pr_address", {"key": "pe_id",
+                        "match": "pe_id",
+                        "fields": {"location_id": s3db.pr_address_anonymise,
+                                   "comments": "remove",
+                                   },
+                        }),
+    """
+
+    db = current.db
+    s3db = current.s3db
+
+    # Get the location
+    if value:
+        ltable = s3db.gis_location
+        row = db(ltable.id == value).select(ltable.id,
+                                            ltable.level,
+                                            limitby = (0, 1),
+                                            ).first()
+        if not row.level:
+            # Specific location => remove address details
+            data = {"addr_street": None,
+                    "addr_postcode": None,
+                    "gis_feature_type": 0,
+                    "lat": None,
+                    "lon": None,
+                    "wkt": None,
+                    }
+            # Doesn't work - PyDAL doesn't detect the None value:
+            #if "the_geom" in ltable.fields:
+            #    data["the_geom"] = None
+            row.update_record(**data)
+            if "the_geom" in ltable.fields:
+                db.executesql("UPDATE gis_location SET the_geom=NULL WHERE id=%s" % row.id)
+
+    return value
+
+# =============================================================================
+def pr_person_obscure_dob(record_id, field, value):
+    """
+        Helper to obscure a date of birth; maps to the first day of
+        the quarter, thus retaining the approximate age for statistics
+
+        @param record_id: the record ID
+        @param field: the Field
+        @param value: the field value
+
+        @return: the new field value
+    """
+
+    if value:
+        month = int((value.month - 1) / 3) * 3 + 1
+        value = value.replace(month=month, day=1)
+
+    return value
 
 # =============================================================================
 def pr_availability_filter(r):

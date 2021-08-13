@@ -753,6 +753,7 @@ def config(settings):
                        disease_id,
                        "probe_date",
                        "result",
+                       "device_id",
                        ]
 
         # Custom form (for read)
@@ -904,6 +905,17 @@ def config(settings):
         return attr
 
     settings.customise_disease_case_diagnostics_controller = customise_disease_case_diagnostics_controller
+
+    # -------------------------------------------------------------------------
+    def poll_dcc():
+        """
+            Scheduler task to poll for DCC requests
+        """
+
+        from .dcc import DCC
+        DCC.poll()
+
+    settings.tasks.poll_dcc = poll_dcc
 
     # -------------------------------------------------------------------------
     def customise_disease_testing_report_resource(r, tablename):
@@ -2953,6 +2965,13 @@ def config(settings):
                            report_options = report_options,
                            )
 
+        # Custom method to produce KV report
+        from .helpers import TestFacilityInfo
+        s3db.set_method("org", "facility",
+                        method = "info",
+                        action = TestFacilityInfo,
+                        )
+
     settings.customise_org_facility_resource = customise_org_facility_resource
 
     # -------------------------------------------------------------------------
@@ -2972,6 +2991,8 @@ def config(settings):
 
             # Restrict data formats
             allowed = ("html", "iframe", "popup", "aadata", "plain", "geojson", "pdf", "xls")
+            if r.method == "info":
+                allowed += ("json", )
             settings.ui.export_formats = ("pdf", "xls")
             if r.representation not in allowed:
                 r.error(403, current.ERROR.NOT_PERMITTED)
@@ -3290,7 +3311,8 @@ def config(settings):
         from s3 import S3PriorityRepresent
         field = table.status
         status_opts = s3db.inv_ship_status
-        status_labels = s3db.inv_shipment_status_labels
+        from s3db.inv import inv_shipment_status_labels
+        status_labels = inv_shipment_status_labels()
         field.represent = S3PriorityRepresent(status_labels,
                                               {status_opts["IN_PROCESS"]: "lightblue",
                                                status_opts["RECEIVED"]: "green",
@@ -3462,7 +3484,8 @@ def config(settings):
         from s3 import S3PriorityRepresent
         field = table.status
         status_opts = s3db.inv_ship_status
-        status_labels = s3db.inv_shipment_status_labels
+        from s3db.inv import inv_shipment_status_labels
+        status_labels = inv_shipment_status_labels()
         field.represent = S3PriorityRepresent(status_labels,
                                               {status_opts["IN_PROCESS"]: "lightblue",
                                                status_opts["RECEIVED"]: "green",
@@ -4638,10 +4661,10 @@ def config(settings):
         field = table.code
         field.requires = [IS_NOT_EMPTY(), field.requires]
 
-        # Represent categories by name, not code
+        # Represent categories by name (no hierarchy)
         field = table.item_category_id
         field.comment = None
-        field.represent = s3db.supply_ItemCategoryRepresent(use_code=False)
+        field.represent = S3Represent(lookup="supply_item_category")
 
         # Use a localized default for um
         field = table.um
