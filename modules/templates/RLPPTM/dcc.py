@@ -198,8 +198,8 @@ class DCC(object):
                          "disease": result.disease_id,
                          "site": facility.site_id,
                          "device": device.code,
-                         "timestamp": int(probe_date.replace(microsecond=0).timestamp()),
-                         "expires": int(expires.replace(microsecond=0).timestamp()),
+                         "timestamp": int(cls.utc_timestamp(probe_date)),
+                         "expires": int(cls.utc_timestamp(expires)),
                          "result": result.result,
                          }
 
@@ -434,7 +434,8 @@ class DCC(object):
         # Convert timestamp into datetime
         timestamp = data.get("timestamp")
         expires = data.get("expires")
-        sc = "%sZ" % datetime.datetime.fromtimestamp(timestamp).isoformat()
+        dt = datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc)
+        sc = "%sZ" %  dt.replace(tzinfo=None).isoformat()
 
         # Convert test result to code
         result_codes = {"NEG": "260415000",
@@ -573,6 +574,7 @@ class DCC(object):
         dcc_base_url = settings.get_custom("dcc_base_url")
         endpoint = "%s/version/v1/publicKey/search" % (dcc_base_url.rstrip("/"))
 
+        errors = []
         for row in rows:
             # Search URL is per-issuer
             search_url = "%s/%s" % (endpoint, row.issuer_id)
@@ -583,26 +585,35 @@ class DCC(object):
                                   )
             except Exception:
                 # Local error
-                error = sys.exc_info()[1]
-                current.log.error("DCC requests: polling failed (local error: %s)" % error)
+                msg = "DCC requests: polling %s failed (local error: %s)" % \
+                      (search_url, sys.exc_info()[1])
+                errors.append(msg)
+                current.log.error(msg)
                 continue
 
             # Check return code
             if sr.status_code != 200:
                 # Remote error
-                current.log.error("DCC requests: polling failed, status code %s" % sr.status_code)
+                msg = "DCC requests: polling %s failed, status code %s" % \
+                      (search_url, sr.status_code)
+                errors.append(msg)
+                current.log.error(msg)
                 continue
 
             # Decode the results
             try:
                 requested_dccs = sr.json()
             except json.JSONDecodeError:
-                error = sys.exc_info()[1]
-                current.log.error("DCC results: server response parse error: %s" % error)
+                msg = "DCC results: %s server response parse error: %s" % \
+                      (search_url, sys.exc_info()[1])
+                errors.append(msg)
+                current.log.error(msg)
                 continue
 
             # If there are any requests, issue the DCCs
             cls.issue(requested_dccs)
+
+        return "\n".join(errors) if errors else None
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -765,6 +776,21 @@ class DCC(object):
             verify = True
 
         return cert, key, verify
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def utc_timestamp(dt):
+        """
+            Convert a tz-naive datetime instance into a UTC timestamp
+
+            @param dt: the datetime
+
+            @returns: timestamp (int)
+        """
+
+        return dt.replace(microsecond = 0,
+                          tzinfo = datetime.timezone.utc,
+                          ).timestamp()
 
     # -------------------------------------------------------------------------
     @staticmethod

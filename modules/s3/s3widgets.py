@@ -89,6 +89,7 @@ __all__ = ("S3ACLWidget",
 
 import datetime
 import json
+import locale
 import os
 import re
 from uuid import uuid4
@@ -111,7 +112,6 @@ from gluon.languages import lazyT
 from gluon.sqlhtml import *
 from gluon.storage import Storage
 
-from s3compat import INTEGER_TYPES, basestring, long, sorted_locale, xrange
 from .s3datetime import S3Calendar, S3DateTime
 from .s3utils import *
 from .s3validators import *
@@ -678,7 +678,7 @@ class S3AddPersonWidget(FormWidget):
         # Extract existing values
         if value:
             record_id = None
-            if isinstance(value, basestring) and not value.isdigit():
+            if isinstance(value, str) and not value.isdigit():
                 data, error = self.parse(value)
                 if not error:
                     if all(k in data for k in formfields):
@@ -1163,7 +1163,7 @@ class S3AddPersonWidget(FormWidget):
                      selected or newly created record
         """
 
-        if not isinstance(value, basestring) or value.isdigit():
+        if not isinstance(value, str) or value.isdigit():
             # Not a JSON object => return as-is
             return value, None
 
@@ -1362,7 +1362,7 @@ class S3AddPersonWidget(FormWidget):
         # Unique email?
         s3db = current.s3db
         ctable = s3db.pr_contact
-        query = (ctable.deleted != True) & \
+        query = (ctable.deleted == False) & \
                 (ctable.contact_method == "EMAIL") & \
                 (ctable.value == value)
         if person_id:
@@ -1406,8 +1406,13 @@ class S3AddPersonWidget(FormWidget):
 
         # Onvalidation? (doesn't currently exist)
 
+        set_record_owner = current.auth.s3_set_record_owner
+        update_super = s3db.update_super
+
         # Create new person record
         person_id = ptable.insert(**person)
+        person_record = {"id": person_id}
+        update_super(ptable, person_record)
 
         if not person_id:
             return (None, T("Could not add person record"))
@@ -1421,18 +1426,16 @@ class S3AddPersonWidget(FormWidget):
             human_resource_id = htable.insert(person_id = person_id,
                                               organisation_id = data_get("organisation_id"),
                                               )
-
-        # Update the super-entities
-        record = {"id": person_id}
-        s3db.update_super(ptable, record)
+            update_super(ptable, {"id": human_resource_id})
+            set_record_owner(htable, human_resource_id)
 
         # Update ownership & realm
-        current.auth.s3_set_record_owner(ptable, person_id)
+        set_record_owner(ptable, person_id)
 
         # Onaccept? (not relevant for this case)
 
         # Read the created pe_id
-        pe_id = record.get("pe_id")
+        pe_id = person_record.get("pe_id")
         if not pe_id:
             return (None, T("Could not add person details"))
 
@@ -1626,7 +1629,7 @@ class S3AgeWidget(FormWidget):
             @param attributes: additional HTML attributes for the widget
         """
 
-        if isinstance(value, basestring) and value and not value.isdigit():
+        if isinstance(value, str) and value and not value.isdigit():
             # ISO String
             value = current.calendar.parse_date(value)
 
@@ -1769,10 +1772,10 @@ class S3AutocompleteWidget(FormWidget):
 
         if value:
             try:
-                value = long(value)
+                value = int(value)
             except ValueError:
                 pass
-            text = s3_unicode(field.represent(value))
+            text = s3_str(field.represent(value))
             if "<" in text:
                 text = s3_strip_markup(text)
             represent = s3_str(text)
@@ -1916,12 +1919,12 @@ class S3ColorPickerWidget(FormWidget):
         # i18n of Strings
         T = current.T
         options = self.options
-        options.update(cancelText = s3_unicode(T("cancel")),
-                       chooseText = s3_unicode(T("choose")),
-                       togglePaletteMoreText = s3_unicode(T("more")),
-                       togglePaletteLessText = s3_unicode(T("less")),
-                       clearText = s3_unicode(T("Clear Color Selection")),
-                       noColorSelectedText = s3_unicode(T("No Color Selected")),
+        options.update(cancelText = s3_str(T("cancel")),
+                       chooseText = s3_str(T("choose")),
+                       togglePaletteMoreText = s3_str(T("more")),
+                       togglePaletteLessText = s3_str(T("less")),
+                       clearText = s3_str(T("Clear Color Selection")),
+                       noColorSelectedText = s3_str(T("No Color Selected")),
                        )
 
         options = json.dumps(options, separators=SEPARATORS)
@@ -3103,7 +3106,7 @@ class S3WeeklyHoursWidget(FormWidget):
             @returns: UL instance
         """
 
-        if isinstance(rules, basestring) and rules:
+        if isinstance(rules, str) and rules:
             try:
                 rules = json.loads(rules)
             except JSONERRORS:
@@ -3538,7 +3541,7 @@ class S3EmbeddedComponentWidget(FormWidget):
             fq = (linktable[rkey] == table[fkey]) & \
                  (linktable[lkey] == _id)
             if "deleted" in linktable:
-                fq &= (linktable.deleted != True)
+                fq &= (linktable.deleted == False)
             linked = current.db(fq).select(table._id)
             from .s3query import FS
             pkey = FS("id")
@@ -3564,7 +3567,7 @@ def S3GenericAutocompleteTemplate(post_process,
     value = transform_value(value)
 
     default = {"_type": "text",
-               "value": (value is not None and s3_unicode(value)) or "",
+               "value": (value is not None and s3_str(value)) or "",
                }
     attr = StringWidget._attributes(field, default, **attributes)
 
@@ -3580,11 +3583,11 @@ def S3GenericAutocompleteTemplate(post_process,
 
     if value:
         try:
-            value = long(value)
+            value = int(value)
         except ValueError:
             pass
         # Provide the representation for the current/default Value
-        text = s3_unicode(field.represent(value))
+        text = s3_str(field.represent(value))
         if "<" in text:
             text = s3_strip_markup(text)
         represent = s3_str(text)
@@ -3796,12 +3799,12 @@ class S3GroupedOptionsWidget(FormWidget):
         none = self.none
         exclude = ("",) if none is not None else ("", None)
 
-        options = [(s3_unicode(k) if k is not None else none,
+        options = [(s3_str(k) if k is not None else none,
                     # Not working with multi-byte str components:
                     #v.flatten()
-                    #    if hasattr(v, "flatten") else s3_unicode(v))
-                    s3_strip_markup(s3_unicode(v.xml()))
-                        if isinstance(v, DIV) else s3_unicode(v))
+                    #    if hasattr(v, "flatten") else s3_str(v))
+                    s3_strip_markup(s3_str(v.xml()))
+                        if isinstance(v, DIV) else s3_str(v))
                    for k, v in options if k not in exclude]
 
         # No options available?
@@ -3813,7 +3816,7 @@ class S3GroupedOptionsWidget(FormWidget):
             values = [value]
         else:
             values = value
-        values = [s3_unicode(v) for v in values]
+        values = [s3_str(v) for v in values]
 
         # Get the tooltips as dict {key: tooltip}
         helptext = {}
@@ -3823,7 +3826,7 @@ class S3GroupedOptionsWidget(FormWidget):
                 help_field = help_field(options)
             if isinstance(help_field, dict):
                 for key in help_field.keys():
-                    helptext[s3_unicode(key)] = help_field[key]
+                    helptext[s3_str(key)] = help_field[key]
             else:
                 ktablename, pkey = s3_get_foreign_key(field)[:2]
                 if ktablename is not None:
@@ -3834,14 +3837,14 @@ class S3GroupedOptionsWidget(FormWidget):
                         rows = current.db(query).select(ktable[pkey],
                                                         ktable[help_field])
                         for row in rows:
-                            helptext[s3_unicode(row[pkey])] = row[help_field]
+                            helptext[s3_str(row[pkey])] = row[help_field]
 
         # Get all letters and their options
         letter_options = {}
         for key, label in options:
             letter = label
             if letter:
-                letter = s3_unicode(label).upper()[0]
+                letter = s3_str(label).upper()[0]
                 if letter in letter_options:
                     letter_options[letter].append((key, label))
                 else:
@@ -3849,7 +3852,7 @@ class S3GroupedOptionsWidget(FormWidget):
 
         # Sort letters
         if letter_options:
-            all_letters = sorted_locale(letter_options.keys())
+            all_letters = sorted(letter_options.keys(), key=locale.strxfrm)
             first_letter = min(u"A", all_letters[0])
             last_letter = max(u"Z", all_letters[-1])
         else:
@@ -4075,7 +4078,7 @@ class S3RadioOptionsWidget(FormWidget):
             options = options.items()
         none = self.none
         exclude = ("",) if none is not None else ("", None)
-        options = [(s3_unicode(k) if k is not None else none, s3_unicode(v))
+        options = [(s3_str(k) if k is not None else none, s3_str(v))
                    for k, v in options if k not in exclude]
 
         # No options available?
@@ -4087,7 +4090,7 @@ class S3RadioOptionsWidget(FormWidget):
             values = [value]
         else:
             values = value
-        values = [s3_unicode(v) for v in values]
+        values = [s3_str(v) for v in values]
 
         # Get the tooltips as dict {key: tooltip}
         helptext = {}
@@ -4097,7 +4100,7 @@ class S3RadioOptionsWidget(FormWidget):
                 help_field = help_field(options)
             if isinstance(help_field, dict):
                 for k, v in help_field.items():
-                    helptext[s3_unicode(k)] = v
+                    helptext[s3_str(k)] = v
             else:
                 ktablename, pkey = s3_get_foreign_key(field)[:2]
                 if ktablename is not None:
@@ -4108,7 +4111,7 @@ class S3RadioOptionsWidget(FormWidget):
                         rows = current.db(query).select(ktable[pkey],
                                                         ktable[help_field])
                         for row in rows:
-                            helptext[s3_unicode(row[pkey])] = row[help_field]
+                            helptext[s3_str(row[pkey])] = row[help_field]
 
         # Prepare output for _render_item()
         _options = []
@@ -4187,11 +4190,11 @@ class S3HumanResourceAutocompleteWidget(FormWidget):
 
         if value:
             try:
-                value = long(value)
+                value = int(value)
             except ValueError:
                 pass
             # Provide the representation for the current/default Value
-            text = s3_unicode(field.represent(value))
+            text = s3_str(field.represent(value))
             if "<" in text:
                 text = s3_strip_markup(text)
             represent = s3_str(text)
@@ -4655,11 +4658,11 @@ class S3LocationAutocompleteWidget(FormWidget):
 
         if value:
             try:
-                value = long(value)
+                value = int(value)
             except ValueError:
                 pass
             # Provide the representation for the current/default Value
-            text = s3_unicode(field.represent(value))
+            text = s3_str(field.represent(value))
             if "<" in text:
                 text = s3_strip_markup(text)
             represent = s3_str(text)
@@ -4733,7 +4736,7 @@ class S3LocationDropdownWidget(FormWidget):
         if self.blank:
             query = (table.id == value)
         elif level:
-            query = (table.deleted != True) & \
+            query = (table.deleted == False) & \
                     (table.level == level)
         else:
             # Workaround for merge form
@@ -4931,7 +4934,7 @@ class S3Selector(FormWidget):
             @return: string representation for the values dict
         """
 
-        return s3_unicode(value)
+        return s3_str(value)
 
     # -------------------------------------------------------------------------
     def validate(self, value, requires=None):
@@ -5042,9 +5045,9 @@ class S3Selector(FormWidget):
         values = None
 
         if value:
-            if isinstance(value, basestring):
+            if isinstance(value, str):
                 if value.isdigit():
-                    record_id = long(value)
+                    record_id = int(value)
                 else:
                     try:
                         values = json.loads(value)
@@ -6436,7 +6439,7 @@ i18n.map_feature_required="%s"''' % (show_map_add,
         row_id = "%s_map_icon__row" % fieldname
         _formstyle = settings.ui.formstyle
         if not _formstyle or \
-           isinstance(_formstyle, basestring) and "foundation" in _formstyle:
+           isinstance(_formstyle, str) and "foundation" in _formstyle:
             # Default: Foundation
             # Need to add custom classes to core HTML markup
             map_icon = DIV(DIV(BUTTON(ICON("globe"),
@@ -6715,7 +6718,7 @@ i18n.location_not_found="%s"''' % (T("Address Mapped"),
         path = [str(record_id)]
         level = None
         append = None
-        for l in xrange(5, -1, -1):
+        for l in range(5, -1, -1):
             lx = value_get("L%s" % l)
             if lx:
                 if not level and not specific and l < 5:
@@ -6747,7 +6750,7 @@ i18n.location_not_found="%s"''' % (T("Address Mapped"),
                                                 ltable.name,
                                                 limitby = limitby
                                                 ).as_dict()
-            for l in xrange(0, 6):
+            for l in range(0, 6):
                 if l in lx_ids:
                     lx_name = lx_names.get(lx_ids[l])["name"]
                 else:
@@ -6982,7 +6985,7 @@ i18n.location_not_found="%s"''' % (T("Address Mapped"),
                 if self.prevent_duplicate_addresses:
                     query = (table.addr_street == address) & \
                             (table.parent == parent) & \
-                            (table.deleted != True)
+                            (table.deleted == False)
                     duplicate = current.db(query).select(table.id,
                                                          limitby = (0, 1)
                                                          ).first()
@@ -7040,9 +7043,9 @@ i18n.location_not_found="%s"''' % (T("Address Mapped"),
                 level = location.level
                 if level:
                     # Accept all levels above and including the lowest selectable level
-                    for i in xrange(5, -1, -1):
+                    for i in range(5, -1, -1):
                         if "L%s" % i in levels:
-                            accepted_levels = set("L%s" % l for l in xrange(i, -1, -1))
+                            accepted_levels = set("L%s" % l for l in range(i, -1, -1))
                             break
                     if level not in accepted_levels:
                         return (values, msg or \
@@ -7402,7 +7405,7 @@ class S3MultiSelectWidget(MultipleOptionsWidget):
             # Select All / Unselect All doesn't make sense if multiple == False
             header_opt = False
         if not isinstance(search_opt, bool) and \
-           (search_opt == "auto" or isinstance(search_opt, INTEGER_TYPES)):
+           (search_opt == "auto" or isinstance(search_opt, int)):
             max_options = 10 if search_opt == "auto" else search_opt
             if options_len > max_options:
                 search_opt = True
@@ -7563,7 +7566,7 @@ class S3CascadeSelectWidget(FormWidget):
 
             # The label for the selector
             row_id = "%s_level_%s" % (input_id, depth)
-            label = T(level) if isinstance(level, basestring) else level
+            label = T(level) if isinstance(level, str) else level
             if self.inline:
                 label = "%s:" % label
             label = LABEL(label, _for=row_id, _id="%s__label" % row_id)
@@ -7617,14 +7620,14 @@ class S3CascadeSelectWidget(FormWidget):
         # Currently selected values
         selected = []
         append = selected.append
-        if isinstance(value, basestring) and value and not value.isdigit():
+        if isinstance(value, str) and value and not value.isdigit():
             value = self.parse(value)[0]
         if not isinstance(value, (list, tuple, set)):
             values = [value]
         else:
             values = value
         for v in values:
-            if isinstance(v, INTEGER_TYPES) or str(v).isdigit():
+            if isinstance(v, int) or str(v).isdigit():
                 append(v)
 
         # Prepend value parser to field validator
@@ -7837,14 +7840,14 @@ class S3HierarchyWidget(FormWidget):
         # Currently selected values
         selected = []
         append = selected.append
-        if isinstance(value, basestring) and value and not value.isdigit():
+        if isinstance(value, str) and value and not value.isdigit():
             value = self.parse(value)[0]
         if not isinstance(value, (list, tuple, set)):
             values = [value]
         else:
             values = value
         for v in values:
-            if isinstance(v, INTEGER_TYPES) or str(v).isdigit():
+            if isinstance(v, int) or str(v).isdigit():
                 append(v)
 
         # Prepend value parser to field validator
@@ -8181,11 +8184,11 @@ class S3PersonAutocompleteWidget(FormWidget):
 
         if value:
             try:
-                value = long(value)
+                value = int(value)
             except ValueError:
                 pass
             # Provide the representation for the current/default Value
-            text = s3_unicode(field.represent(value))
+            text = s3_str(field.represent(value))
             if "<" in text:
                 text = s3_strip_markup(text)
             represent = s3_str(text)
@@ -8279,11 +8282,11 @@ class S3PentityAutocompleteWidget(FormWidget):
 
         if value:
             try:
-                value = long(value)
+                value = int(value)
             except ValueError:
                 pass
             # Provide the representation for the current/default Value
-            text = s3_unicode(field.represent(value))
+            text = s3_str(field.represent(value))
             if "<" in text:
                 text = s3_strip_markup(text)
             represent = s3_str(text)
@@ -8417,17 +8420,17 @@ class S3SiteAutocompleteWidget(FormWidget):
 
         if value:
             try:
-                value = long(value)
+                value = int(value)
             except ValueError:
                 pass
             # Provide the representation for the current/default Value
             represent = field.represent
             if hasattr(represent, "link"):
                 # S3Represent, so don't generate HTML
-                text = s3_unicode(represent(value, show_link=False))
+                text = s3_str(represent(value, show_link=False))
             else:
                 # Custom represent, so filter out HTML later
-                text = s3_unicode(represent(value))
+                text = s3_str(represent(value))
                 if "<" in text:
                     text = s3_strip_markup(text)
             represent = s3_str(text)
@@ -8438,7 +8441,7 @@ class S3SiteAutocompleteWidget(FormWidget):
         site_types = current.auth.org_site_types
         for instance_type in site_types:
             # Change from T()
-            site_types[instance_type] = s3_unicode(site_types[instance_type])
+            site_types[instance_type] = s3_str(site_types[instance_type])
         site_types = '''S3.org_site_types=%s''' % json.dumps(site_types, separators=SEPARATORS)
 
         settings = current.deployment_settings
@@ -8628,7 +8631,7 @@ class S3TimeIntervalWidget(FormWidget):
 
         if value is None:
             value = 0
-        elif isinstance(value, basestring):
+        elif isinstance(value, str):
             try:
                 value = int(value)
             except ValueError:
@@ -9039,7 +9042,7 @@ class S3PhoneWidget(StringWidget):
 def s3_comments_widget(field, value, **attr):
     """
         A smaller-than-normal textarea
-        to be used by the s3.comments() & gis.desc_field Reusable fields
+        to be used by the s3_comments & gis.desc_field Reusable fields
     """
 
     _id = attr.get("_id", "%s_%s" % (field._tablename, field.name))

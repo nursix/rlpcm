@@ -18,10 +18,6 @@ def config(settings):
     # http://eden.sahanafoundation.org/wiki/DeveloperGuidelines/PrePopulate
     settings.base.prepopulate.append("default/Demo")
 
-    # Enable Guided Tours
-    # - defaults to module enabled or not
-    #settings.base.guided_tour = True
-
     # Authentication settings
     # Should users be allowed to register themselves?
     #settings.security.self_registration = True
@@ -145,10 +141,6 @@ def config(settings):
             access = "|1|",     # Only Administrators can see this module in the default menu & access the controller
             module_type = None  # This item is handled separately for the menu
         )),
-        #("tour", Storage(
-        #    name_nice = T("Guided Tour Functionality"),
-        #    module_type = None,
-        #)),
         ("translate", Storage(
             name_nice = T("Translation Functionality"),
             #description = "Selective translation of strings based on module.",
@@ -388,13 +380,6 @@ def config(settings):
         #    restricted = True,
         #    module_type = 10,
         #)),
-        # Requires RPy2 & PostgreSQL
-        #("climate", Storage(
-        #    name_nice = T("Climate"),
-        #    #description = "Climate data portal",
-        #    restricted = True,
-        #    module_type = 10,
-        #)),
         #("delphi", Storage(
         #    name_nice = T("Delphi Decision Maker"),
         #    #description = "Supports the decision making of large groups of Crisis Management Experts by helping the groups create ranked list.",
@@ -421,12 +406,6 @@ def config(settings):
         #    #description = "Used by Assess",
         #    restricted = True,
         #    module_type = None,
-        #)),
-        #("ocr", Storage(
-        #   name_nice = T("Optical Character Recognition"),
-        #   #description = "Optical Character Recognition for reading the scanned handwritten paper forms.",
-        #   restricted = False,
-        #   module_type = None,
         #)),
         #("work", Storage(
         #   name_nice = T("Jobs"),

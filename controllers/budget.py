@@ -24,7 +24,7 @@ def index():
 
     module_name = settings.modules[module].get("name_nice")
     response.title = module_name
-    return {"module_name": module_name, 
+    return {"module_name": module_name,
             }
 
 # =============================================================================
@@ -205,7 +205,7 @@ def kit_export_xls():
         session.error = "xlwt module not available within the running Python - this needs installing for XLS output!"
         redirect(URL(c="kit"))
 
-    from s3compat import BytesIO
+    from io import BytesIO
     output = BytesIO()
 
     book = xlwt.Workbook()
@@ -283,7 +283,6 @@ def kit_export_pdf():
     """
         Export a list of Kits in Adobe PDF format
         Uses Geraldo SubReport
-        @ToDo: Use S3PDF Method
     """
     try:
         from reportlab.lib.units import cm
@@ -305,7 +304,7 @@ def kit_export_pdf():
         session.warning = T("No data in this table - cannot create PDF!")
         redirect(URL(r=request))
 
-    from s3compat import BytesIO
+    from io import BytesIO
     output = BytesIO()
 
     #class MySubReport(SubReport):
@@ -452,7 +451,6 @@ def item_export_pdf():
     """
         Export a list of Items in Adobe PDF format
         Uses Geraldo Grouping Report
-        @ToDo: Use S3PDF Method
     """
     try:
         from reportlab.lib.units import cm
@@ -474,7 +472,7 @@ def item_export_pdf():
         session.warning = T("No data in this table - cannot create PDF!")
         redirect(URL(f="item"))
 
-    from s3compat import BytesIO
+    from io import BytesIO
     output = BytesIO()
 
     class MyReport(Report):
