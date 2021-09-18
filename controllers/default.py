@@ -274,38 +274,6 @@ $('#login-btn').click(function(){
 })''' % post_script
             s3.jquery_ready.append(register_script)
 
-    # Feed Control
-    rss = settings.frontpage.rss
-    if rss:
-        s3.external_stylesheets.append("//www.google.com/uds/solutions/dynamicfeed/gfdynamicfeedcontrol.css")
-        s3.scripts.append("//www.google.com/jsapi?key=notsupplied-wizard")
-        s3.scripts.append("//www.google.com/uds/solutions/dynamicfeed/gfdynamicfeedcontrol.js")
-
-        feeds = ["{title:'%s',url:'%s'}" % (feed["title"], feed["url"])
-                 for feed in rss
-                 ]
-        feeds = ",".join(feeds)
-
-        # feedCycleTime: milliseconds before feed is reloaded (5 minutes)
-        feed_control = "".join(('''
-function LoadDynamicFeedControl(){
- var feeds=[
-  ''', feeds, '''
- ]
- var options={
-  feedCycleTime:300000,
-  numResults:5,
-  stacked:true,
-  horizontal:false,
-  title:"''', s3_str(T("News")), '''"
- }
- new GFdynamicFeedControl(feeds,'feed-control',options)
-}
-google.load('feeds','1')
-google.setOnLoadCallback(LoadDynamicFeedControl)'''))
-
-        s3.js_global.append(feed_control)
-
     # Output dict for the view
     output = {"title": title,
 
@@ -371,7 +339,7 @@ def about():
                     }
 
         if item:
-            from s3 import S3XMLContents
+            from core import S3XMLContents
             contents = S3XMLContents(item.body)
             if ADMIN:
                 item = DIV(contents,
@@ -851,7 +819,7 @@ def masterkey():
 
     # If successfully logged-in, provide context information for
     # the master key (e.g. project UUID + title, master key UUID)
-    from s3.s3masterkey import S3MasterKey
+    from core.auth.masterkey import S3MasterKey
     return S3MasterKey.context()
 
 # -----------------------------------------------------------------------------
@@ -905,7 +873,7 @@ def organisation():
     rfields = data["rfields"]
     data = data["rows"]
 
-    dt = S3DataTable(rfields, data)
+    dt = s3base.S3DataTable(rfields, data)
     dt.defaultActionButtons(resource)
     s3.no_formats = True
 
