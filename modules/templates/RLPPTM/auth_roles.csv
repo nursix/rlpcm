@@ -15,6 +15,7 @@ ANONYMOUS,Anonymous,Unauthenticated users,,,,project_project,READ,,
 AUTHENTICATED,Authenticated,,,gis,location,,CREATE|READ,UPDATE|DELETE,
 AUTHENTICATED,Authenticated,,,pr,contact,,CREATE,READ|UPDATE|DELETE,
 AUTHENTICATED,Authenticated,,,pr,contact_emergency,,CREATE,READ|UPDATE|DELETE,
+AUTHENTICATED,Authenticated,,,,,disease_demographic,READ,,
 AUTHENTICATED,Authenticated,,,,,disease_disease,READ,,
 AUTHENTICATED,Authenticated,,,,,gis_location,CREATE|READ,UPDATE|DELETE,
 AUTHENTICATED,Authenticated,,,,,hrm_human_resource,NONE,READ|UPDATE,
@@ -33,8 +34,10 @@ AUTHENTICATED,Authenticated,,,,,pr_person,NONE,READ|UPDATE|DELETE,
 AUTHENTICATED,Authenticated,,,,,pr_person_details,CREATE,READ|UPDATE,
 DISEASE_TEST_READER,Disease Test Reader,,,disease,case_diagnostics,,READ,,any
 DISEASE_TEST_READER,Disease Test Reader,,,disease,testing_report,,READ,,any
+DISEASE_TEST_READER,Disease Test Reader,,,disease,testing_demographic,,READ,,any
 DISEASE_TEST_READER,Disease Test Reader,,,disease,,,READ,,
 DISEASE_TEST_READER,Disease Test Reader,,,,,disease_case_diagnostics,READ,,any
+DISEASE_TEST_READER,Disease Test Reader,,,,,disease_testing_demographic,READ,,any
 DISEASE_TEST_READER,Disease Test Reader,,,,,disease_testing_report,READ,,any
 DISEASE_TEST_READER,Disease Test Reader,,,,,project_project,READ,,any
 MAP_ADMIN,,,true,gis,location,,CREATE|READ|UPDATE|DELETE,,
@@ -120,10 +123,12 @@ PROVIDER_ACCOUNTANT,Provider Accountant,,,,,fin_voucher_debit,READ,,
 PROVIDER_ACCOUNTANT,Provider Accountant,,,,,fin_voucher_program,READ,,any
 SUPPLY_COORDINATOR,Supply Coordinator,,,inv,send,,CREATE|READ|UPDATE|DELETE,,any
 SUPPLY_COORDINATOR,Supply Coordinator,,,inv,send_process,,READ|UPDATE,,any
+SUPPLY_COORDINATOR,Supply Coordinator,,,inv,track_item,,READ,,any
 SUPPLY_COORDINATOR,Supply Coordinator,,,inv,warehouse,,CREATE|READ|UPDATE|DELETE,,
 SUPPLY_COORDINATOR,Supply Coordinator,,,inv,,,READ,,
 SUPPLY_COORDINATOR,Supply Coordinator,,,req,req,,CREATE,,
 SUPPLY_COORDINATOR,Supply Coordinator,,,req,req,,READ,,any
+SUPPLY_COORDINATOR,Supply Coordinator,,,req,req_item,,READ,,any
 SUPPLY_COORDINATOR,Supply Coordinator,,,req,send,,READ|UPDATE|DELETE,,
 SUPPLY_COORDINATOR,Supply Coordinator,,,req,,,READ,,
 SUPPLY_COORDINATOR,Supply Coordinator,,,supply,item,,CREATE|READ|UPDATE|DELETE,,
@@ -144,6 +149,7 @@ TEST_PROVIDER,Test Provider,,,disease,,,READ,,
 TEST_PROVIDER,Test Provider,,,disease,testing_report,,CREATE|READ|UPDATE|DELETE,,
 TEST_PROVIDER,Test Provider,,,disease,,,READ,,
 TEST_PROVIDER,Test Provider,,,,,disease_case_diagnostics,CREATE|READ|UPDATE|DELETE,,
+TEST_PROVIDER,Test Provider,,,,,disease_testing_demographic,CREATE|READ|UPDATE|DELETE,,
 TEST_PROVIDER,Test Provider,,,,,disease_testing_report,CREATE|READ|UPDATE|DELETE,,
 TEST_PROVIDER,Test Provider,,,,,org_site,READ,,
 VOUCHER_ISSUER,Voucher Issuer,,,fin,voucher,,READ,,any

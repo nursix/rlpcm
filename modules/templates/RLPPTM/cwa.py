@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
-
 """
-    Infection test result reporting for RLPPTM template
+    Infection test result reporting for RLPPTM
 
-    @license: MIT
+    License: MIT
 """
 
 import base64
@@ -18,7 +16,7 @@ import uuid
 from gluon import current, Field, IS_EMPTY_OR, IS_IN_SET, SQLFORM, URL, \
                   BUTTON, DIV, FORM, H5, INPUT, TABLE, TD, TR
 
-from core import IS_ONE_OF, S3CustomController, S3Method, \
+from core import IS_ONE_OF, S3CustomController, CRUDMethod, \
                  s3_date, s3_mark_required, s3_qrcode_represent, \
                  JSONERRORS
 
@@ -30,7 +28,7 @@ CWA = {"system": "RKI / Corona-Warn-App",
        }
 
 # =============================================================================
-class TestResultRegistration(S3Method):
+class TestResultRegistration(CRUDMethod):
     """ REST Method to Register Test Results """
 
     # -------------------------------------------------------------------------
@@ -38,8 +36,9 @@ class TestResultRegistration(S3Method):
         """
             Page-render entry point for REST interface.
 
-            @param r: the S3Request instance
-            @param attr: controller attributes
+            Args:
+                r: the CRUDRequest instance
+                attr: controller attributes
         """
 
         output = {}
@@ -58,8 +57,9 @@ class TestResultRegistration(S3Method):
         """
             Register a test result
 
-            @param r: the S3Request instance
-            @param attr: controller attributes
+            Args:
+                r: the CRUDRequest instance
+                attr: controller attributes
         """
 
         if r.http not in ("GET", "POST"):
@@ -119,6 +119,15 @@ class TestResultRegistration(S3Method):
         if isinstance(requires, IS_EMPTY_OR):
             field.requires = requires.other
 
+        # Configure demographic_id
+        if settings.get_disease_testing_report_by_demographic():
+            field = table.demographic_id
+            field.readable = field.writable = True
+            requires = field.requires
+            if isinstance(requires, IS_EMPTY_OR):
+                field.requires = requires.other
+            offset += 1
+
         # Configure device_id
         field = table.device_id
         field.readable = field.writable = True
@@ -141,6 +150,7 @@ class TestResultRegistration(S3Method):
                       table.site_id,
                       table.disease_id,
                       table.probe_date,
+                      table.demographic_id,
                       table.device_id,
                       table.result,
 
@@ -238,6 +248,8 @@ class TestResultRegistration(S3Method):
                 testresult["probe_date"] = formvars["probe_date"]
             if "device_id" in formvars:
                 testresult["device_id"] = formvars["device_id"]
+            if "demographic_id" in formvars:
+                testresult["demographic_id"] = formvars["demographic_id"]
 
             record_id = table.insert(**testresult)
             if not record_id:
@@ -398,8 +410,9 @@ class TestResultRegistration(S3Method):
         """
             Generate a test certificate (PDF) for download
 
-            @param r: the S3Request instance
-            @param attr: controller attributes
+            Args:
+                r: the CRUDRequest instance
+                attr: controller attributes
         """
 
         if not r.record:
@@ -495,8 +508,9 @@ class TestResultRegistration(S3Method):
         """
             Retry sending test result to CWA result server
 
-            @param r: the S3Request instance
-            @param attr: controller attributes
+            Args:
+                r: the CRUDRequest instance
+                attr: controller attributes
         """
 
         if not r.record:
@@ -549,7 +563,7 @@ class TestResultRegistration(S3Method):
         return output
 
 # =============================================================================
-class CWAReport(object):
+class CWAReport:
     """
         CWA Report Generator
         @see: https://github.com/corona-warn-app/cwa-quicktest-onboarding/wiki/Anbindung-der-Partnersysteme
@@ -566,18 +580,18 @@ class CWAReport(object):
                  dhash=None,
                  ):
         """
-            Constructor
+            Args:
+                result_id: the disease_case_diagnostics record ID
+                anonymous: generate anonymous report
+                first_name: first name
+                last_name: last name
+                dob: date of birth (str in isoformat, or datetime.date)
+                dcc: whether to provide a digital test certificate
+                salt: previously used salt (for retry)
+                dhash: previously generated hash (for retry)
 
-            @param result_id: the disease_case_diagnostics record ID
-            @param anonymous: generate anonymous report
-            @param first_name: first name
-            @param last_name: last name
-            @param dob: date of birth (str in isoformat, or datetime.date)
-            @param dcc: whether to provide a digital test certificate
-            @param salt: previously used salt (for retry)
-            @param dhash: previously generated hash (for retry)
-
-            @note: if not anonymous, personal data are required
+            Note:
+                - if not anonymous, personal data are required
         """
 
         db = current.db
@@ -649,7 +663,8 @@ class CWAReport(object):
         """
             Produce a secure 128-bit (=16 bytes) random hex token
 
-            @returns: the token as str
+            Returns:
+                the token as str
         """
         return secrets.token_hex(16).upper()
 
@@ -662,7 +677,8 @@ class CWAReport(object):
             - personal : [dob]#[fn]#[ln]#[timestamp]#[testid]#[salt]
             - anonymous: [timestamp]#[salt]
 
-            @returns: the hash as str
+            Returns:
+                the hash as str
         """
 
         hashable = lambda fields: "#".join(str(data[k]) for k in fields)
@@ -678,7 +694,8 @@ class CWAReport(object):
         """
             Construct the link for QR code generation
 
-            @returns: the link as str
+            Returns:
+                the link as str
         """
 
         # Template for CWA-link
@@ -690,8 +707,8 @@ class CWAReport(object):
             data["dgc"] = True
 
         # Convert data to JSON
-        from core import SEPARATORS
-        data_json = json.dumps(data, separators=SEPARATORS)
+        from core import JSONSEPARATORS
+        data_json = json.dumps(data, separators=JSONSEPARATORS)
 
         # Base64-encode the data JSON
         data_str = base64.urlsafe_b64encode(data_json.encode("utf-8")).decode("utf-8")
@@ -707,9 +724,11 @@ class CWAReport(object):
         """
             Helper to convert an ISO-formatted date to local format
 
-            @param dtstr: the ISO-formatted date as string
+            Args:
+                dtstr: the ISO-formatted date as string
 
-            @returns: the date in local format as string
+            Returns:
+                the date in local format as string
         """
 
         c = current.calendar
@@ -721,12 +740,14 @@ class CWAReport(object):
         """
             Formatted version of this report
 
-            @param retry: add retry-action for sending to CWA
+            Args:
+                retry: add retry-action for sending to CWA
 
-            @returns: a FORM containing
-                      - the QR-code
-                      - human-readable report details
-                      - actions to download PDF, or retry sending to CWA
+            Returns:
+                a FORM containing
+                    - the QR-code
+                    - human-readable report details
+                    - actions to download PDF, or retry sending to CWA
         """
 
         T = current.T
@@ -841,9 +862,10 @@ class CWAReport(object):
         """
             Register consent assertion using the current hash as reference
 
-            @param processing type: the data processing type for which
-                                    consent is required
-            @param response: the consent response
+            Args:
+                processing type: the data processing type for which
+                                 consent is required
+                response: the consent response
         """
 
         data = self.data
@@ -861,7 +883,8 @@ class CWAReport(object):
             Send the CWA Report to the server;
             see also: https://github.com/corona-warn-app/cwa-quicktest-onboarding/blob/master/api/quicktest-openapi.json
 
-            @returns: True|False whether successful
+            Returns:
+                True|False whether successful
         """
 
         # Encode the result

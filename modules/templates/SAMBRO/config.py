@@ -56,7 +56,6 @@ def config(settings):
     # 5: Apply Controller, Function & Table ACLs
     # 6: Apply Controller, Function, Table ACLs and Entity Realm
     # 7: Apply Controller, Function, Table ACLs and Entity Realm + Hierarchy
-    # 8: Apply Controller, Function, Table ACLs, Entity Realm + Hierarchy and Delegations
     settings.security.policy = 4 # Controller-Function ACLs
 
     # Record Approval
@@ -772,8 +771,8 @@ def config(settings):
         """
             Custom Method to pre-render the contents for the message template
 
-            @param resource: the S3Resource
-            @param data: the data returned from S3Resource.select
+            @param resource: the CRUDResource
+            @param data: the data returned from CRUDResource.select
             @param meta_data: the meta data for the notification
             @param format: the contents format ("text" or "html")
         """
@@ -833,8 +832,8 @@ def config(settings):
     def custom_msg_notify_subject(resource, data, meta_data):
         """
             Custom Method to subject for the email
-            @param resource: the S3Resource
-            @param data: the data returned from S3Resource.select
+            @param resource: the CRUDResource
+            @param data: the data returned from CRUDResource.select
             @param meta_data: the meta data for the notification
         """
 
@@ -860,8 +859,8 @@ def config(settings):
     def custom_msg_notify_attachment(resource, data, meta_data):
         """
             Custom Method to get the document_ids to be sent as attachment
-            @param resource: the S3Resource
-            @param data: the data returned from S3Resource.select
+            @param resource: the CRUDResource
+            @param data: the data returned from CRUDResource.select
             @param meta_data: the meta data for the notification
         """
 
@@ -881,8 +880,8 @@ def config(settings):
     def custom_msg_notify_send_data(resource, data, meta_data):
         """
             Custom Method to send data containing alert_id to the S3Msg.send_by_pe_id
-            @param resource: the S3Resource
-            @param data: the data returned from S3Resource.select
+            @param resource: the CRUDResource
+            @param data: the data returned from CRUDResource.select
             @param meta_data: the meta data for the notification
         """
 

@@ -1,10 +1,7 @@
-# -*- coding: utf-8 -*-
-
 """
-    Application Template for Rhineland-Palatinate (RLP) Crisis Management
-    - used to manage COVID-19 test stations
+    RLPPTM: Template for Rhineland-Palatinate (RLP) COVID-19 Test Stations Portal
 
-    @license MIT
+    License: MIT
 """
 
 from collections import OrderedDict
@@ -14,7 +11,7 @@ from gluon import current, URL, A, DIV, TAG, \
 
 from gluon.storage import Storage
 
-from core import FS, IS_FLOAT_AMOUNT, ICON, IS_ONE_OF, S3Represent, s3_str
+from core import FS, IS_FLOAT_AMOUNT, ICON, IS_ONE_OF, IS_UTC_DATE, S3CRUD, S3Represent, s3_str
 from s3dal import original_tablename
 
 from .rlpgeonames import rlp_GeoNames
@@ -145,8 +142,6 @@ def config(settings):
     # 5: Apply Controller, Function & Table ACLs
     # 6: Apply Controller, Function, Table ACLs and Entity Realm
     # 7: Apply Controller, Function, Table ACLs and Entity Realm + Hierarchy
-    # 8: Apply Controller, Function, Table ACLs, Entity Realm + Hierarchy and Delegations
-    #
     settings.security.policy = 7
 
     # -------------------------------------------------------------------------
@@ -155,6 +150,9 @@ def config(settings):
     settings.pr.name_format= "%(last_name)s, %(first_name)s"
 
     settings.pr.availability_json_rules = True
+
+    # -------------------------------------------------------------------------
+    settings.disease.testing_report_by_demographic = True
 
     # -------------------------------------------------------------------------
     settings.hrm.record_tab = True
@@ -219,6 +217,18 @@ def config(settings):
     # -------------------------------------------------------------------------
     # Custom settings
     settings.custom.test_station_registration = True
+    settings.custom.test_station_cleanup = True
+
+    # -------------------------------------------------------------------------
+    def poll_dcc():
+        """
+            Scheduler task to poll for DCC requests
+        """
+
+        from .dcc import DCC
+        return DCC.poll()
+
+    settings.tasks.poll_dcc = poll_dcc
 
     # -------------------------------------------------------------------------
     # Realm Rules
@@ -273,6 +283,30 @@ def config(settings):
                                     ).first()
             if site:
                 realm_entity = site.realm_entity
+            else:
+                # Fall back to user organisation
+                user = current.auth.user
+                organisation_id = user.organisation_id if user else None
+                if not organisation_id:
+                    # Fall back to default organisation
+                    organisation_id = settings.get_org_default_organisation()
+                if organisation_id:
+                    realm_entity = s3db.pr_get_pe_id("org_organisation",
+                                                     organisation_id,
+                                                     )
+
+        elif tablename == "disease_testing_demographic":
+            # Demographics subtotals inherit the realm-entity from
+            # the main report
+            table = s3db.table(tablename)
+            rtable = s3db.disease_testing_report
+            query = (table._id == row.id) & \
+                    (rtable.id == table.report_id)
+            report = db(query).select(rtable.realm_entity,
+                                      limitby = (0, 1),
+                                      ).first()
+            if report:
+                realm_entity = report.realm_entity
             else:
                 # Fall back to user organisation
                 user = current.auth.user
@@ -616,67 +650,24 @@ def config(settings):
         table = s3db.disease_case_diagnostics
         query = (table.id == record_id)
         record = db(query).select(table.site_id,
-                                  table.disease_id,
                                   table.result_date,
+                                  table.disease_id,
                                   limitby = (0, 1),
                                   ).first()
         if not record:
             return
 
         site_id = record.site_id
-        disease_id = record.disease_id
         result_date = record.result_date
+        disease_id = record.disease_id
 
         if site_id and disease_id and result_date:
-
-            # Count records grouped by result
-            query = (table.site_id == site_id) & \
-                    (table.disease_id == disease_id) & \
-                    (table.result_date == result_date) & \
-                    (table.deleted == False)
-            cnt = table.id.count()
-            rows = db(query).select(table.result,
-                                    cnt,
-                                    groupby = table.result,
-                                    )
-            total = positive = 0
-            for row in rows:
-                num = row[cnt]
-                total += num
-                if row.disease_case_diagnostics.result == "POS":
-                    positive += num
-
-            # Look up the daily report
-            rtable = s3db.disease_testing_report
-            query = (rtable.site_id == site_id) & \
-                    (rtable.disease_id == disease_id) & \
-                    (rtable.date == result_date) & \
-                    (rtable.deleted == False)
-            report = db(query).select(rtable.id,
-                                      rtable.tests_total,
-                                      rtable.tests_positive,
-                                      limitby = (0, 1),
-                                      ).first()
-
-            if report:
-                # Update report if actual numbers are greater
-                if report.tests_total < total or report.tests_positive < positive:
-                    report.update_record(tests_total = total,
-                                         tests_positive = positive,
-                                         )
+            # Update daily testing report
+            if settings.get_disease_testing_report_by_demographic():
+                from .helpers import update_daily_report_by_demographic as update_daily_report
             else:
-                # Create report
-                report = {"site_id": site_id,
-                          "disease_id": disease_id,
-                          "date": result_date,
-                          "tests_total": total,
-                          "tests_positive": positive,
-                          }
-                report_id = rtable.insert(**report)
-                if report_id:
-                    current.auth.s3_set_record_owner(rtable, report_id)
-                    report["id"] = report_id
-                    s3db.onaccept(rtable, report, method="create")
+                from .helpers import update_daily_report
+            update_daily_report(site_id, result_date, disease_id)
 
     # -------------------------------------------------------------------------
     def customise_disease_case_diagnostics_resource(r, tablename):
@@ -788,10 +779,17 @@ def config(settings):
             site_id = None
         disease_id = "disease_id" if not single_disease else None
 
+        if settings.get_disease_testing_report_by_demographic():
+            table.demographic_id.readable = True
+            demographic_id = "demographic_id"
+        else:
+            demographic_id = None
+
         # Custom list_fields
         list_fields = [site_id,
                        disease_id,
                        "probe_date",
+                       demographic_id,
                        "result",
                        "device_id",
                        ]
@@ -801,12 +799,13 @@ def config(settings):
         crud_form = S3SQLCustomForm(disease_id,
                                     site_id,
                                     "probe_date",
+                                    demographic_id,
                                     "result",
                                     "result_date",
                                     )
 
         # Filters
-        from core import S3DateFilter, S3OptionsFilter
+        from core import S3DateFilter, S3OptionsFilter, s3_get_filter_opts
         filter_widgets = [S3DateFilter("probe_date",
                                        label = T("Date"),
                                        hide_time = True,
@@ -825,7 +824,15 @@ def config(settings):
             # - better scalability, but cannot select multiple
             filter_widgets.append(S3OptionsFilter("site_id", hidden=True))
         if disease_id:
-            filter_widgets.append(S3OptionsFilter("disease_id", hidden=True))
+            filter_widgets.append(S3OptionsFilter("disease_id",
+                                                  options = lambda: s3_get_filter_opts("disease_disease"),
+                                                  hidden=True,
+                                                  ))
+        if demographic_id:
+            filter_widgets.append(S3OptionsFilter("demographic_id",
+                                                  options = lambda: s3_get_filter_opts("disease_demographic"),
+                                                  hidden=True,
+                                                  ))
 
         # Report options
         facts = ((T("Number of Tests"), "count(id)"),
@@ -866,15 +873,15 @@ def config(settings):
 
         # Custom REST methods
         from .cwa import TestResultRegistration
-        s3db.set_method("disease", "case_diagnostics",
+        s3db.set_method("disease_case_diagnostics",
                         method = "register",
                         action = TestResultRegistration,
                         )
-        s3db.set_method("disease", "case_diagnostics",
+        s3db.set_method("disease_case_diagnostics",
                         method = "certify",
                         action = TestResultRegistration,
                         )
-        s3db.set_method("disease", "case_diagnostics",
+        s3db.set_method("disease_case_diagnostics",
                         method = "cwaretry",
                         action = TestResultRegistration,
                         )
@@ -933,10 +940,9 @@ def config(settings):
                     elif record and method in (None, "read"):
                         key, label = "list_btn", T("Register another test result")
                 if key:
-                    crud = r.resource.crud
-                    regbtn =  crud.crud_button(label = label,
-                                               _href = r.url(id="", method="register"),
-                                               )
+                    regbtn = S3CRUD.crud_button(label = label,
+                                                _href = r.url(id="", method="register"),
+                                                )
                     output["buttons"] = {key: regbtn}
 
             return output
@@ -947,17 +953,6 @@ def config(settings):
     settings.customise_disease_case_diagnostics_controller = customise_disease_case_diagnostics_controller
 
     # -------------------------------------------------------------------------
-    def poll_dcc():
-        """
-            Scheduler task to poll for DCC requests
-        """
-
-        from .dcc import DCC
-        return DCC.poll()
-
-    settings.tasks.poll_dcc = poll_dcc
-
-    # -------------------------------------------------------------------------
     def customise_disease_testing_report_resource(r, tablename):
 
         db = current.db
@@ -966,6 +961,7 @@ def config(settings):
         table = s3db.disease_testing_report
 
         list_fields = ["date",
+                       (T("Test Station ID"), "site_id$org_facility.code"),
                        "site_id",
                        #"disease_id",
                        "tests_total",
@@ -989,19 +985,68 @@ def config(settings):
         else:
             list_fields.insert(1, "disease_id")
 
-        # If there is only one selectable site, set as default + make r/o
+        if r.tablename == "disease_testing_report" and r.record and \
+           settings.get_disease_testing_report_by_demographic() and \
+           r.method != "read" and \
+           current.auth.s3_has_permission("update", table, record_id=r.record.id):
+            # Hide totals in create/update form
+            table.tests_total.readable = False
+            table.tests_positive.readable = False
+
+        # Order testing sites selector by obsolete-flag
         field = table.site_id
-        requires = field.requires
-        if hasattr(requires, "options"):
-            selectable = [o[0] for o in field.requires.options() if o[0]]
-            if len(selectable) == 1:
-                field.default = selectable[0]
-                field.writable = False
+        stable = current.s3db.org_site
+        field.requires = IS_ONE_OF(db, "org_site.site_id",
+                                   field.represent,
+                                   instance_types = ["org_facility"],
+                                   orderby = (stable.obsolete, stable.name),
+                                   sort = False,
+                                   )
+        # Check how many sites are selectable
+        selectable = [o[0] for o in field.requires.options() if o[0]]
+        if len(selectable) == 1:
+            # If only one selectable site, set as default + make r/o
+            field.default = selectable[0]
+            field.writable = False
+        else:
+            # If one active site, set it as default, but leave selectable
+            query = (stable.site_id.belongs(selectable)) & \
+                    (stable.obsolete == False)
+            active = db(query).select(stable.site_id, limitby = (0, 2))
+            if len(active) == 1:
+                field.default = active.first().site_id
+
+        # Allow daily reports up to 3 months back in time (1st of month)
+        field = table.date
+
+        from dateutil.relativedelta import relativedelta
+        today = current.request.utcnow.date()
+        earliest = today - relativedelta(months=3, day=1)
+
+        from core import S3CalendarWidget, S3DateFilter, S3TextFilter
+        field.requires = IS_UTC_DATE(minimum = earliest,
+                                     maximum = today,
+                                     )
+        field.widget = S3CalendarWidget(minimum = earliest,
+                                        maximum = today,
+                                        month_selector = True,
+                                        )
 
         # Daily reports only writable for ORG_ADMINs of test stations
         writable = current.auth.s3_has_roles(["ORG_ADMIN", "TEST_PROVIDER"], all=True)
 
+        filter_widgets = [S3TextFilter(["site_id$name",
+                                        "site_id$org_facility.code",
+                                        "comments",
+                                        ],
+                                       label = T("Search"),
+                                       ),
+                          S3DateFilter("date",
+                                       ),
+                          ]
+
         s3db.configure("disease_testing_report",
+                       filter_widgets = filter_widgets,
                        list_fields = list_fields,
                        insertable = writable,
                        editable = writable,
@@ -1657,19 +1702,16 @@ def config(settings):
         table = current.s3db.fin_voucher_billing
 
         # Color-coded representation of billing process status
-        from core import S3PriorityRepresent
         field = table.status
-        try:
-            status_opts = field.represent.options
-        except AttributeError:
-            pass
-        else:
-            field.represent = S3PriorityRepresent(status_opts,
-                                                  {"SCHEDULED": "lightblue",
-                                                   "IN PROGRESS": "amber",
-                                                   "ABORTED": "black",
-                                                   "COMPLETE": "green",
-                                                   }).represent
+
+        from core import S3PriorityRepresent
+        status_opts = s3db.fin_voucher_billing_status_opts
+        field.represent = S3PriorityRepresent(status_opts,
+                                              {"SCHEDULED": "lightblue",
+                                               "IN PROGRESS": "amber",
+                                               "ABORTED": "black",
+                                               "COMPLETE": "green",
+                                               }).represent
 
         # Custom onaccept to maintain realm-assignment of invoices
         # when accountant organisation changes
@@ -1791,19 +1833,16 @@ def config(settings):
             field.readable = field.writable = False
 
         # Color-coded representation of claim status
-        from core import S3PriorityRepresent
         field = table.status
-        try:
-            status_opts = field.represent.options
-        except AttributeError:
-            pass
-        else:
-            field.represent = S3PriorityRepresent(status_opts,
-                                                  {"NEW": "lightblue",
-                                                   "CONFIRMED": "blue",
-                                                   "INVOICED": "amber",
-                                                   "PAID": "green",
-                                                   }).represent
+
+        from core import S3PriorityRepresent
+        status_opts = s3db.fin_voucher_claim_status_opts
+        field.represent = S3PriorityRepresent(status_opts,
+                                              {"NEW": "lightblue",
+                                               "CONFIRMED": "blue",
+                                               "INVOICED": "amber",
+                                               "PAID": "green",
+                                               }).represent
 
         # Custom list fields
         list_fields = [#"refno",
@@ -1843,7 +1882,7 @@ def config(settings):
 
         # PDF export method
         from .helpers import ClaimPDF
-        s3db.set_method("fin", "voucher_claim",
+        s3db.set_method("fin_voucher_claim",
                         method = "record",
                         action = ClaimPDF,
                         )
@@ -1932,7 +1971,8 @@ def config(settings):
         """
             Callback to notify the provider that an invoice has been settled
 
-            @param invoice: the invoice (Row)
+            Args:
+                invoice: the invoice (Row)
         """
 
         db = current.db
@@ -2123,7 +2163,7 @@ def config(settings):
 
         # PDF export method
         from .helpers import InvoicePDF
-        s3db.set_method("fin", "voucher_invoice",
+        s3db.set_method("fin_voucher_invoice",
                         method = "record",
                         action = InvoicePDF,
                         )
@@ -2248,18 +2288,25 @@ def config(settings):
                                                    "multiple": False,
                                                    }),
                                     )
+
+                # Site obsolete-flag representation
+                stable = s3db.org_site
+                field = stable.obsolete
+                field.label = T("Closed")
+                field.represent = lambda v, row=None: T("yes") if v else "-"
+
                 list_fields = ["organisation_id",
+                               "site_id",
+                               "site_id$obsolete",
+                               "site_id$location_id$addr_street",
+                               "site_id$location_id$L4",
+                               "site_id$location_id$L3",
+                               "site_id$location_id$addr_postcode",
                                "person_id",
                                "job_title_id",
-                               "site_id",
                                (T("Email"), "person_id$email.value"),
                                (phone_label, "person_id$phone.value"),
-                               "person_id$home_address.location_id$addr_street",
-                               "person_id$home_address.location_id$L4",
-                               "person_id$home_address.location_id$L3",
-                               "person_id$home_address.location_id$addr_postcode",
-                               "person_id$home_address.location_id$L2",
-                               "person_id$home_address.location_id$L1",
+                               (T("Home Address"), "person_id$home_address.location_id"),
                                "status",
                                ]
             else:
@@ -2423,7 +2470,7 @@ def config(settings):
 
             # Add invite-method for ORG_GROUP_ADMIN role
             from .helpers import InviteUserOrg
-            s3db.set_method("org", "organisation",
+            s3db.set_method("org_organisation",
                             method = "invite",
                             action = InviteUserOrg,
                             )
@@ -2890,6 +2937,7 @@ def config(settings):
         # Custom list fields
         list_fields = ["name",
                        #"organisation_id",
+                       "organisation_id$organisation_type__link.organisation_type_id",
                        (T("Telephone"), "phone1"),
                        "email",
                        (T("Opening Hours"), "opening_times"),
@@ -3134,6 +3182,7 @@ def config(settings):
                     "service_site.service_id",
                     (T("Project"), "organisation_id$project.name"),
                     (T("Organization Group"), "organisation_id$group_membership.group_id"),
+                    "organisation_id$organisation_type__link.organisation_type_id",
                     (T("Requested Items"), "req.req_item.item_id"),
                     ]
 
@@ -3156,7 +3205,7 @@ def config(settings):
 
         # Custom method to produce KV report
         from .helpers import TestFacilityInfo
-        s3db.set_method("org", "facility",
+        s3db.set_method("org_facility",
                         method = "info",
                         action = TestFacilityInfo,
                         )
@@ -3300,7 +3349,6 @@ def config(settings):
                 # Override list-button to go to summary
                 buttons = output.get("buttons")
                 if isinstance(buttons, dict) and "list_btn" in buttons:
-                    from core import S3CRUD
                     summary = r.url(method="summary", id="", component="")
                     buttons["list_btn"] = S3CRUD.crud_button(label = T("List Facilities"),
                                                              _href = summary,
@@ -3753,34 +3801,6 @@ def config(settings):
         # Do not check for site_id (unused)
         s3db.clear_config("inv_send", "onvalidation")
 
-        if r.method == "report":
-            axes = [(T("Orderer"), "to_site_id"),
-                    "to_site_id$location_id$L3",
-                    "to_site_id$location_id$L2",
-                    "to_site_id$location_id$L1",
-                    (T("Shipment Items"), "track_item.item_id"),
-                    (T("Distribution Center"), "site_id"),
-                    "status",
-                    ]
-
-            report_options = {
-                "rows": axes,
-                "cols": axes,
-                "fact": [(T("Number of Shipments"), "count(id)"),
-                         (T("Number of Items"), "count(track_item.id)"),
-                         (T("Sent Quantity"), "sum(track_item.quantity)"),
-                        ],
-                "defaults": {"rows": "track_item.item_id",
-                             "cols": "status",
-                             "fact": "sum(track_item.quantity)",
-                             "totals": True,
-                             },
-                }
-
-            s3db.configure(tablename,
-                           report_options = report_options,
-                           )
-
     settings.customise_inv_send_resource = customise_inv_send_resource
 
     # -------------------------------------------------------------------------
@@ -4122,6 +4142,33 @@ def config(settings):
                            deletable = False,
                            )
 
+        if r.method == "report":
+            axes = [(T("Orderer"), "send_id$to_site_id"),
+                    "send_id$to_site_id$location_id$L3",
+                    "send_id$to_site_id$location_id$L2",
+                    "send_id$to_site_id$location_id$L1",
+                    (T("Shipment Items"), "item_id"),
+                    (T("Distribution Center"), "send_id$site_id"),
+                    "send_id$status",
+                    ]
+
+            report_options = {
+                "rows": axes,
+                "cols": axes,
+                "fact": [(T("Number of Shipments"), "count(send_id)"),
+                         (T("Number of Items"), "count(id)"),
+                         (T("Sent Quantity"), "sum(quantity)"),
+                        ],
+                "defaults": {"rows": "item_id",
+                             "cols": "send_id$status",
+                             "fact": "sum(quantity)",
+                             "totals": True,
+                             },
+                }
+            s3db.configure("inv_track_item",
+                           report_options = report_options,
+                           )
+
         # Override standard-onaccept to prevent inventory updates
         s3db.configure("inv_track_item",
                        onaccept = inv_track_item_onaccept,
@@ -4376,7 +4423,7 @@ def config(settings):
         if auth.s3_has_role("SUPPLY_COORDINATOR"):
             # Custom method to register a shipment
             from .requests import RegisterShipment
-            s3db.set_method("req", "req",
+            s3db.set_method("req_req",
                             method = "ship",
                             action = RegisterShipment,
                             )
@@ -4411,34 +4458,6 @@ def config(settings):
         # Custom label for Pack
         field = ritable.item_pack_id
         field.label = T("Order Unit")
-
-        if r.method == "report":
-            axes = [(T("Orderer"), "site_id"),
-                    "site_id$location_id$L3",
-                    "site_id$location_id$L2",
-                    "site_id$location_id$L1",
-                    (T("Requested Items"), "req_item.item_id"),
-                    "transit_status",
-                    "fulfil_status",
-                    ]
-
-            report_options = {
-                "rows": axes,
-                "cols": axes,
-                "fact": [(T("Number of Requests"), "count(id)"),
-                         (T("Number of Items"), "count(req_item.id)"),
-                         (T("Requested Quantity"), "sum(req_item.quantity)"),
-                        ],
-                "defaults": {"rows": "site_id$location_id$L2",
-                             "cols": None,
-                             "fact": "count(id)",
-                             "totals": True,
-                             },
-                }
-
-            s3db.configure(tablename,
-                           report_options = report_options,
-                           )
 
     settings.customise_req_req_resource = customise_req_req_resource
 
@@ -4685,7 +4704,6 @@ def config(settings):
                     stable = s3db.org_site
 
                     # Default action buttons (except delete)
-                    from core import S3CRUD
                     S3CRUD.action_buttons(r, deletable =False)
 
                     if has_role("SUPPLY_COORDINATOR"):
@@ -4870,6 +4888,35 @@ def config(settings):
                                  req_req_item_create_onaccept,
                                  method = "create",
                                  )
+
+        if r.method == "report":
+            axes = [(T("Orderer"), "req_id$site_id"),
+                    "req_id$site_id$location_id$L3",
+                    "req_id$site_id$location_id$L2",
+                    "req_id$site_id$location_id$L1",
+                    (T("Requested Items"), "item_id"),
+                    "req_id$transit_status",
+                    "req_id$fulfil_status",
+                    ]
+
+            report_options = {
+                "rows": axes,
+                "cols": axes,
+                "fact": [(T("Number of Requests"), "count(req_id)"),
+                         (T("Number of Items"), "count(id)"),
+                         (T("Requested Quantity"), "sum(quantity)"),
+                        ],
+                "defaults": {"rows": "req_id$site_id$location_id$L2",
+                             "cols": None,
+                             "fact": "count(req_id)",
+                             "totals": True,
+                             },
+                }
+
+            s3db.configure(tablename,
+                           report_options = report_options,
+                           )
+
 
     settings.customise_req_req_item_resource = customise_req_req_item_resource
 

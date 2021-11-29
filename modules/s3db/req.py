@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
+"""
+    Request Model
 
-""" Sahana Eden Request Model
-
-    @copyright: 2009-2021 (c) Sahana Software Foundation
-    @license: MIT
+    Copyright: 2009-2021 (c) Sahana Software Foundation
 
     Permission is hereby granted, free of charge, to any person
     obtaining a copy of this software and associated documentation
@@ -115,7 +113,7 @@ def req_priority():
                            label = current.T("Priority"),
                            #@ToDo: Colour code the priority text - red, orange, green
                            #represent = req_priority_represent,
-                           represent = S3Represent(options = priority_opts),
+                           represent = represent_option(priority_opts),
                            requires = IS_EMPTY_OR(
                                            IS_IN_SET(priority_opts)
                                            ),
@@ -139,7 +137,7 @@ def req_status():
     status_opts = req_status_opts()
     return S3ReusableField("req_status", "integer",
                            label = current.T("Request Status"),
-                           represent = S3Represent(options = status_opts),
+                           represent = represent_option(status_opts),
                            requires = IS_EMPTY_OR(
                                         IS_IN_SET(status_opts,
                                                   zero = None,
@@ -157,19 +155,17 @@ def req_timeframe():
                       5: T("5-7 days"),
                       6: T(">1 week"),
                       }
-    return S3ReusableField("timeframe", "integer",
-                           default = 3,
-                           label = T("Timeframe"),
-                           represent = S3Represent(options = timeframe_opts),
-                           requires = IS_EMPTY_OR(
-                                        IS_IN_SET(timeframe_opts,
-                                                  zero = None,
-                                                  ),
-                                        ),
-                           )
+    return Field("timeframe", "integer",
+                 default = 3,
+                 label = T("Timeframe"),
+                 represent = represent_option(timeframe_opts),
+                 requires = IS_EMPTY_OR(
+                                IS_IN_SET(timeframe_opts, zero = None),
+                                ),
+                 )
 
 # =============================================================================
-class RequestModel(S3Model):
+class RequestModel(DataModel):
     """
         Model for Requests
     """
@@ -431,7 +427,7 @@ class RequestModel(S3Model):
                                 label = T("Status"),
                                 default = workflow_default,
                                 requires = IS_IN_SET(workflow_opts),
-                                represent = S3Represent(options = workflow_opts),
+                                represent = represent_option(workflow_opts),
                                 readable = use_workflow,
                                 writable = False,
                                 ),
@@ -684,28 +680,28 @@ class RequestModel(S3Model):
                        )
 
         # Custom Methods
-        set_method("req", "req",
+        set_method("req_req",
                    method = "check",
                    action = req_CheckMethod())
 
-        set_method("req", "req",
+        set_method("req_req",
                    method = "commit_all",
                    action = self.req_commit_all)
 
-        set_method("req", "req",
+        set_method("req_req",
                    method = "copy_all",
                    action = self.req_copy_all)
 
-        set_method("req", "req",
+        set_method("req_req",
                    method = "submit",
                    action = self.req_submit)
 
-        set_method("req", "req",
+        set_method("req_req",
                    method = "approve_req", # Don't clash with core approve method
                    action = self.req_approve)
 
         # Print Forms
-        set_method("req", "req",
+        set_method("req_req",
                    method = "form",
                    action = self.req_form)
 
@@ -780,8 +776,8 @@ class RequestModel(S3Model):
         """
             Represent a Request
 
-            @todo: document parameters
-            @todo: S3Represent
+            TODO document parameters
+            TODO S3Represent
         """
 
         if row:
@@ -1489,17 +1485,16 @@ class RequestModel(S3Model):
 
             if settings.get_req_use_req_number() and not record.req_ref:
                 # Auto-generate req_ref
-                from s3db.supply import supply_get_shipping_code
-                code = supply_get_shipping_code(settings.get_req_shortname(),
-                                                record.site_id,
-                                                table.req_ref,
-                                                )
+                code = s3db.supply_get_shipping_code(settings.get_req_shortname(),
+                                                     record.site_id,
+                                                     table.req_ref,
+                                                     )
                 update["req_ref"] = code
 
             req_status = record.req_status
             if req_status is not None:
                 status_requires = table.req_status.requires
-                if status_requires.hasattr("other"):
+                if hasattr(status_requires, "other"):
                     status_requires = status_requires.other
                 opts = [opt[0] for opt in status_requires.options()]
                 if str(REQ_STATUS_CANCEL) in opts:
@@ -1652,7 +1647,8 @@ class RequestModel(S3Model):
             Remove any scheduled tasks when deleting a recurring request
             template
 
-            @param row: the deleted req_req Row
+            Args:
+                row: the deleted req_req Row
         """
 
         db = current.db
@@ -1662,7 +1658,7 @@ class RequestModel(S3Model):
         db(query).delete()
 
 # =============================================================================
-class RequestApproverModel(S3Model):
+class RequestApproverModel(DataModel):
     """
         Model for request approvers
     """
@@ -1746,10 +1742,10 @@ class RequestApproverModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
 # =============================================================================
-class RequestItemModel(S3Model):
+class RequestItemModel(DataModel):
     """
         Model for requested items
     """
@@ -2077,9 +2073,9 @@ $.filterOptionsS3({
     @staticmethod
     def req_quantity_represent(quantity, qtype, show_link=True):
         """
-            @todo: better docstring
-            @ToDo: There should be better control of this feature - currently this only works
-                   with req_items which are being matched by commit / send / recv
+            TODO better docstring
+            TODO There should be better control of this feature - currently this only works
+                 with req_items which are being matched by commit / send / recv
         """
 
         if quantity and show_link and \
@@ -2098,14 +2094,15 @@ $.filterOptionsS3({
     def req_item_duplicate(item):
         """
             This callback will be called when importing records. It will look
-            to see if the record being imported is a duplicate.
+            to see if the record being imported is a duplicate. If the record
+            is a duplicate then it will set the item method to update
 
-            @param item: An S3ImportItem object which includes all the details
-                         of the record being imported
+            Args:
+                item: An ImportItem object which includes all the details
+                      of the record being imported
 
-            If the record is a duplicate then it will set the item method to update
-
-            Rules for finding a duplicate:
+            Notes:
+                Rules for finding a duplicate:
                 - If the Request Number matches
                 - The item is the same
         """
@@ -2146,7 +2143,7 @@ $.filterOptionsS3({
             item.method = item.METHOD.UPDATE
 
 # =============================================================================
-class RequestSkillModel(S3Model):
+class RequestSkillModel(DataModel):
     """
         Modell for requested skills
     """
@@ -2433,7 +2430,7 @@ class RequestSkillModel(S3Model):
             return current.messages.UNKNOWN_OPT
 
 # =============================================================================
-class RequestRecurringModel(S3Model):
+class RequestRecurringModel(DataModel):
     """
         Adjuvant model to support request generation by scheduler
     """
@@ -2469,14 +2466,14 @@ class RequestRecurringModel(S3Model):
             msg_no_match = T("No jobs configured"))
 
         # Custom Methods
-        self.set_method("req", "req",
-                        component_name = "job",
+        self.set_method("req_req",
+                        component = "job",
                         method = "reset",
                         action = req_job_reset,
                         )
 
-        self.set_method("req", "req",
-                        component_name = "job",
+        self.set_method("req_req",
+                        component = "job",
                         method = "run",
                         action = req_job_run,
                         )
@@ -2484,10 +2481,10 @@ class RequestRecurringModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
 # =============================================================================
-class RequestNeedsModel(S3Model):
+class RequestNeedsModel(DataModel):
     """
         Simple Requests Management System
         - Starts as Simple free text Needs
@@ -2607,7 +2604,7 @@ class RequestNeedsModel(S3Model):
                             )
 
         # Custom Methods
-        self.set_method("req", "need",
+        self.set_method("req_need",
                         method = "assign",
                         action = self.pr_AssignMethod(component="need_person"))
 
@@ -2644,7 +2641,7 @@ class RequestNeedsModel(S3Model):
                 }
 
 # =============================================================================
-class RequestNeedsActivityModel(S3Model):
+class RequestNeedsActivityModel(DataModel):
     """
         Simple Requests Management System
         - optional link to Activities (Activity created to respond to Need)
@@ -2676,10 +2673,10 @@ class RequestNeedsActivityModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
 # =============================================================================
-class RequestNeedsContactModel(S3Model):
+class RequestNeedsContactModel(DataModel):
     """
         Simple Requests Management System
         - optional link to Contacts (People)
@@ -2715,10 +2712,10 @@ class RequestNeedsContactModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
 # =============================================================================
-class RequestNeedsDemographicsModel(S3Model):
+class RequestNeedsDemographicsModel(DataModel):
     """
         Simple Requests Management System
         - optional link to Demographics
@@ -2758,7 +2755,7 @@ class RequestNeedsDemographicsModel(S3Model):
                                           empty = False,
                                           comment = parameter_id_comment,
                                           ),
-                          req_timeframe()(),
+                          req_timeframe(),
                           Field("value", "double",
                                 label = T("Number"),
                                 #label = T("Number in Need"),
@@ -2812,10 +2809,10 @@ class RequestNeedsDemographicsModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
 # =============================================================================
-class RequestNeedsItemsModel(S3Model):
+class RequestNeedsItemsModel(DataModel):
     """
         Simple Requests Management System
         - optional extension to support Items, but still not using Inventory-linked Requests
@@ -2851,7 +2848,7 @@ $.filterOptionsS3({
                                               widget = None,
                                               ),
                           self.supply_item_pack_id(),
-                          req_timeframe()(),
+                          req_timeframe(),
                           Field("quantity", "double",
                                 label = T("Quantity"),
                                 #label = T("Quantity Requested"),
@@ -2910,10 +2907,10 @@ $.filterOptionsS3({
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
 # =============================================================================
-class RequestNeedsSkillsModel(S3Model):
+class RequestNeedsSkillsModel(DataModel):
     """
         Simple Requests Management System
         - optional extension to support Skills, but still not using normal Requests
@@ -2983,10 +2980,10 @@ class RequestNeedsSkillsModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
 # =============================================================================
-class RequestNeedsLineModel(S3Model):
+class RequestNeedsLineModel(DataModel):
     """
         Simple Requests Management System
         - optional extension to support Demographics & Items within a single Line
@@ -3101,7 +3098,7 @@ $.filterOptionsS3({
                                 requires = IS_EMPTY_OR(
                                             IS_FLOAT_AMOUNT(minimum=1.0)),
                                 ),
-                          req_timeframe()(),
+                          req_timeframe(),
                           Field("quantity_committed", "double",
                                 label = T("Quantity Committed"),
                                 represent = lambda v: \
@@ -3168,7 +3165,7 @@ $.filterOptionsS3({
 
 
 # =============================================================================
-class RequestNeedsOrganisationModel(S3Model):
+class RequestNeedsOrganisationModel(DataModel):
     """
         Simple Requests Management System
         - optional link to Organisations
@@ -3210,10 +3207,10 @@ class RequestNeedsOrganisationModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
 # =============================================================================
-class RequestNeedsPersonModel(S3Model):
+class RequestNeedsPersonModel(DataModel):
     """
         Simple Requests Management System
         - optional link to People (used for assignments to Skills)
@@ -3247,7 +3244,7 @@ class RequestNeedsPersonModel(S3Model):
                           Field("status", "integer",
                                 default = 4, # Invited
                                 label = T("Status"),
-                                represent = S3Represent(options=status_opts),
+                                represent = represent_option(status_opts),
                                 requires = IS_EMPTY_OR(
                                             IS_IN_SET(status_opts)),
                                 ),
@@ -3278,10 +3275,10 @@ class RequestNeedsPersonModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
 # =============================================================================
-class RequestNeedsSectorModel(S3Model):
+class RequestNeedsSectorModel(DataModel):
     """
         Simple Requests Management System
         - optional link to Sectors
@@ -3313,10 +3310,10 @@ class RequestNeedsSectorModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
 # =============================================================================
-class RequestNeedsSiteModel(S3Model):
+class RequestNeedsSiteModel(DataModel):
     """
         Simple Requests Management System
         - optional link to Sites
@@ -3356,10 +3353,10 @@ class RequestNeedsSiteModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
 # =============================================================================
-class RequestNeedsTagModel(S3Model):
+class RequestNeedsTagModel(DataModel):
     """
         Needs Tags
     """
@@ -3406,10 +3403,10 @@ class RequestNeedsTagModel(S3Model):
                        )
 
         # Pass names back to global scope (s3.*)
-        return {}
+        return None
 
 # =============================================================================
-class RequestNeedsResponseModel(S3Model):
+class RequestNeedsResponseModel(DataModel):
     """
         A Response to a Need
         - a group of Activities
@@ -3519,7 +3516,7 @@ class RequestNeedsResponseModel(S3Model):
                 }
 
 # =============================================================================
-class RequestNeedsResponseLineModel(S3Model):
+class RequestNeedsResponseLineModel(DataModel):
     """
         A Line within a Response to a Need
         - an Activity
@@ -3565,7 +3562,7 @@ class RequestNeedsResponseLineModel(S3Model):
                           self.org_sector_id(),
                           Field("modality", "integer",
                                 label = T("Modality"),
-                                represent = S3Represent(options = modality_opts),
+                                represent = represent_option(modality_opts),
                                 requires = IS_IN_SET(modality_opts),
                                 ),
                           s3_date(label = T("Date Planned")),
@@ -3630,10 +3627,10 @@ $.filterOptionsS3({
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
 # =============================================================================
-class RequestNeedsResponseOrganisationModel(S3Model):
+class RequestNeedsResponseOrganisationModel(DataModel):
     """
         Organisations involved in Activity Groups
     """
@@ -3670,7 +3667,7 @@ class RequestNeedsResponseOrganisationModel(S3Model):
                                 requires = IS_EMPTY_OR(
                                             IS_IN_SET(project_organisation_roles)
                                             ),
-                                represent = S3Represent(options=project_organisation_roles),
+                                represent = represent_option(project_organisation_roles),
                                 ),
                           s3_comments(),
                           *s3_meta_fields())
@@ -3686,10 +3683,10 @@ class RequestNeedsResponseOrganisationModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
 # =============================================================================
-class RequestTagModel(S3Model):
+class RequestTagModel(DataModel):
     """
         Request Tags
     """
@@ -3729,10 +3726,10 @@ class RequestTagModel(S3Model):
                        )
 
         # Pass names back to global scope (s3.*)
-        return {}
+        return None
 
 # =============================================================================
-class RequestOrderItemModel(S3Model):
+class RequestOrderItemModel(DataModel):
     """
         Simple Item Ordering for Requests
         - for when Procurement model isn't being used
@@ -3800,10 +3797,10 @@ class RequestOrderItemModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
 # =============================================================================
-class RequestProjectModel(S3Model):
+class RequestProjectModel(DataModel):
     """
         Link Requests to Projects
     """
@@ -3832,10 +3829,10 @@ class RequestProjectModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
 # =============================================================================
-class RequestTaskModel(S3Model):
+class RequestTaskModel(DataModel):
     """
         Link Requests for Skills to Tasks
     """
@@ -3866,10 +3863,10 @@ class RequestTaskModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
 # =============================================================================
-class RequestRequesterCategoryModel(S3Model):
+class RequestRequesterCategoryModel(DataModel):
     """
         Model to control which types of requester can request which items
         - used by RLPPTM
@@ -3905,10 +3902,10 @@ class RequestRequesterCategoryModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
 # =============================================================================
-class CommitModel(S3Model):
+class CommitModel(DataModel):
     """
         Model for commits (pledges)
     """
@@ -4129,7 +4126,7 @@ class CommitModel(S3Model):
                        )
 
         # Custom Method to Assign HRs
-        self.set_method("req", "commit",
+        self.set_method("req_commit",
                         method = "assign",
                         action = self.hrm_AssignMethod(component="commit_person",
                                                        next_tab="commit_person",
@@ -4225,7 +4222,7 @@ class CommitModel(S3Model):
         req_update_commit_quantities_and_status(req)
 
 # =============================================================================
-class CommitItemModel(S3Model):
+class CommitItemModel(DataModel):
     """
         Model for committed (pledged) items
     """
@@ -4352,7 +4349,7 @@ class CommitItemModel(S3Model):
                 req_update_commit_quantities_and_status(req)
 
 # =============================================================================
-class CommitPersonModel(S3Model):
+class CommitPersonModel(DataModel):
     """
         Commit a named individual to a Request
 
@@ -4408,7 +4405,7 @@ class CommitPersonModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -4446,7 +4443,7 @@ class CommitPersonModel(S3Model):
         #req_skill_onaccept(None)
 
 # =============================================================================
-class CommitSkillModel(S3Model):
+class CommitSkillModel(DataModel):
     """
         Commit anonymous people to a Request
 
@@ -4493,7 +4490,7 @@ class CommitSkillModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -4573,8 +4570,8 @@ def req_ref_represent(value, show_link=True, pdf=False):
         if show_link is True then it will generate a link to the record
         if pdf is True then it will generate a link to the PDF
 
-        @todo: document parameters
-        @todo: S3Represent
+        TODO document parameters
+        TODO S3Represent
     """
 
     if value:
@@ -4604,10 +4601,12 @@ def req_tabs(r, match=True):
     """
         Add a set of rheader tabs for a site's request management
 
-        @param r: the S3Request (for permission checking)
-        @param match: request matching is applicable for this type of site
+        Args:
+            r: the CRUDRequest (for permission checking)
+            match: request matching is applicable for this type of site
 
-        @return: list of rheader tab definitions
+        Returns:
+            list of rheader tab definitions
     """
 
     settings = current.deployment_settings
@@ -4699,7 +4698,8 @@ def req_update_commit_quantities_and_status(req):
     """
         Update commit quantities and status of a request
 
-        @param req: the req_req record (Row)
+        Args:
+            req: the req_req record (Row)
     """
 
     db = current.db
@@ -4974,7 +4974,7 @@ def req_rheader(r, check_page=False):
     """
         Resource Header for Requests & Needs
 
-        @todo: improve structure/readability
+        TODO improve structure/readability
     """
 
     if r.representation != "html":
@@ -5240,11 +5240,13 @@ def req_match(rheader = None):
             - add as req_match controller to the module, then
             - configure as rheader-tab "req_match/" for the site resource
 
-        @param rheader: module-specific rheader
+        Args:
+            rheader: module-specific rheader
 
-        NB make sure rheader uses s3_rheader_resource to handle "viewing"
-        NB can override rheader in customise_req_req_controller by
-           updating attr dict
+        Notes:
+            - make sure rheader uses s3_rheader_resource to handle "viewing"
+            - can override rheader in customise_req_req_controller by
+              updating attr dict
     """
 
     T = current.T
@@ -5346,10 +5348,7 @@ def req_match(rheader = None):
         return output
     s3.postp = postp
 
-    output = current.rest_controller("req", "req",
-                                     rheader = rheader,
-                                     )
-    return output
+    return current.crud_controller("req", "req", rheader=rheader)
 
 # =============================================================================
 def req_send_commit():
@@ -5448,19 +5447,21 @@ def req_send_commit():
                  ))
 
 # =============================================================================
-class req_CheckMethod(S3Method):
+class req_CheckMethod(CRUDMethod):
     """
         Check to see if you can match a Request
             - Using the Inventory of your Site if this is an Items request
             - Using the Skills of your HRs if this is a Skills request
     """
 
+    # -------------------------------------------------------------------------
     def apply_method(self, r, **attr):
         """
-            Apply method.
+            Applies the method (controller entry point).
 
-            @param r: the S3Request
-            @param attr: controller options for this request
+            Args:
+                r: the CRUDRequest
+                attr: controller options for this request
         """
 
         req_type = r.record.type
@@ -5824,10 +5825,9 @@ class req_RequesterRepresent(S3Represent):
 
     def __init__(self, show_link=True):
         """
-            Constructor
-
-            @param show_link: render as link to the contact tab of
-                              the requester (in PR/HRM/VOL as appropriate)
+            Args:
+                show_link: render as link to the contact tab of
+                           the requester (in PR/HRM/VOL as appropriate)
         """
 
         super(req_RequesterRepresent, self).__init__(lookup = "pr_person",
@@ -5839,9 +5839,10 @@ class req_RequesterRepresent(S3Represent):
         """
             Custom look-up of rows
 
-            @param key: the key field
-            @param values: the values to look up
-            @param fields: unused (retained for API compatibility)
+            Args:
+                key: the key field
+                values: the values to look up
+                fields: unused (retained for API compatibility)
         """
 
         s3db = current.s3db
@@ -5881,7 +5882,8 @@ class req_RequesterRepresent(S3Represent):
         """
             Represent a row
 
-            @param row: the Row
+            Args:
+                row: the Row
         """
 
         if not hasattr(row, "pr_person"):
@@ -5905,9 +5907,10 @@ class req_RequesterRepresent(S3Represent):
         """
             Represent a (key, value) as hypertext link.
 
-            @param k: the key
-            @param v: the representation of the key
-            @param row: the row with this key
+            Args:
+                k: the key
+                v: the representation of the key
+                row: the row with this key
         """
 
         hr_type = None
@@ -5936,9 +5939,6 @@ class req_RequesterRepresent(S3Represent):
 class req_ReqItemRepresent(S3Represent):
 
     def __init__(self):
-        """
-            Constructor
-        """
 
         super(req_ReqItemRepresent, self).__init__(lookup = "req_req_item",
                                                    )
@@ -5948,9 +5948,10 @@ class req_ReqItemRepresent(S3Represent):
         """
             Custom look-up of rows
 
-            @param key: the key field
-            @param values: the values to look up
-            @param fields: unused (retained for API compatibility)
+            Args:
+                key: the key field
+                values: the values to look up
+                fields: unused (retained for API compatibility)
         """
 
         ritable = self.table
@@ -5976,7 +5977,8 @@ class req_ReqItemRepresent(S3Represent):
         """
             Represent a row
 
-            @param row: the Row
+            Args:
+                row: the Row
         """
 
         if not hasattr(row, "supply_item"):
@@ -5991,9 +5993,6 @@ class req_CommitRepresent(S3Represent):
     """
 
     def __init__(self):
-        """
-            Constructor
-        """
 
         super(req_CommitRepresent, self).__init__(lookup = "req_commit",
                                                   )
@@ -6003,9 +6002,10 @@ class req_CommitRepresent(S3Represent):
         """
             Custom look-up of rows
 
-            @param key: the key field
-            @param values: the values to look up
-            @param fields: unused (retained for API compatibility)
+            Args:
+                key: the key field
+                values: the values to look up
+                fields: unused (retained for API compatibility)
         """
 
         table = self.table
@@ -6053,7 +6053,8 @@ class req_CommitRepresent(S3Represent):
         """
             Represent a row
 
-            @param row: the Row
+            Args:
+                row: the Row
         """
 
         table = self.table
@@ -6134,7 +6135,8 @@ def req_add_from_template(req_id):
         Add a Request from a Template (scheduled function to create
         recurring requests)
 
-        @param req_id: record ID of the request template
+        Args:
+            req_id: record ID of the request template
     """
 
     fieldnames = ["type",
@@ -6396,7 +6398,8 @@ def req_hide_quantities(table):
     """
         Hide per-status quantity fields in Request create-forms
 
-        @param table: the Table (req_item or req_skill)
+        Args:
+            table: the Table (req_item or req_skill)
     """
 
     if not current.deployment_settings.get_req_item_quantities_writable():
@@ -6411,10 +6414,11 @@ def req_hide_quantities(table):
 def req_inline_form(req_type, method):
     """
         Function to be called from REST prep functions
-         - to add req_item & req_skill components as inline forms
+            - to add req_item & req_skill components as inline forms
 
-        @param req_type: the request type (1=items, 3=skills)
-        @param method: the URL request method
+        Args:
+            req_type: the request type (1=items, 3=skills)
+            method: the URL request method
     """
 
     T = current.T

@@ -19,20 +19,20 @@
 # When running these tests in order to optimize the environment, you can
 # use these benchmarks as a rough guideline for what you can expect:
 #
-# S3Model.configure = 2.90979003906 µs
-# S3Model.get_config = 2.2715420723 µs
-# S3Model.table(non-table) = 2.13528013229 µs
-# S3Model.get(non-table) = 2.0619969368 µs
-# S3Model.__getattr__(non-table) = 4.12402009964 µs
-# S3Model.__getitem__(non-table) = 4.24327015877 µs
-# S3Model.table = 2.91769790649 µs
-# S3Model.__getattr__ = 4.959856987 µs
-# S3Model.__getitem__ = 5.19830703735 µs
-# S3Resource.import_xml = 12.0009431839 ms (=83 rec/sec)
-# S3Resource.export (incl. DB extraction) = 3.75156188011 ms (=266 rec/sec)
-# S3Resource.export (w/o DB extraction) = 1.7192029953 ms (=581 rec/sec)
-# S3Resource.__init__ = 2.65161395073 ms
-# S3Resource.load = 5.55664610863 ms
+# DataModel.configure = 2.90979003906 µs
+# DataModel.get_config = 2.2715420723 µs
+# DataModel.table(non-table) = 2.13528013229 µs
+# DataModel.get(non-table) = 2.0619969368 µs
+# DataModel.__getattr__(non-table) = 4.12402009964 µs
+# DataModel.__getitem__(non-table) = 4.24327015877 µs
+# DataModel.table = 2.91769790649 µs
+# DataModel.__getattr__ = 4.959856987 µs
+# DataModel.__getitem__ = 5.19830703735 µs
+# CRUDResource.import_xml = 12.0009431839 ms (=83 rec/sec)
+# CRUDResource.export (incl. DB extraction) = 3.75156188011 ms (=266 rec/sec)
+# CRUDResource.export (w/o DB extraction) = 1.7192029953 ms (=581 rec/sec)
+# CRUDResource.__init__ = 2.65161395073 ms
+# CRUDResource.load = 5.55664610863 ms
 #
 # If you cannot achieve approximately these or even better results, then
 # it is recommendable to put effort into the optimization of the environment
@@ -84,7 +84,7 @@ class S3PerformanceTests(unittest.TestCase):
         mlt = timeit.Timer(x).timeit(number = 10) * (100/n)
         info("db.select = %s ms/query (=%s q/sec)" % (mlt, int(1000/mlt)))
 
-    def testS3ModelTable(self):
+    def testDataModelTable(self):
 
         s3db = current.s3db
 
@@ -93,20 +93,20 @@ class S3PerformanceTests(unittest.TestCase):
         if table is not None:
             x = lambda: s3db.table("pr_person")
             mlt = timeit.Timer(x).timeit()
-            info("S3Model.table = %s µs" % mlt)
+            info("DataModel.table = %s µs" % mlt)
             self.assertTrue(mlt<10)
 
             x = lambda: s3db.pr_person
             mlt = timeit.Timer(x).timeit()
-            info("S3Model.__getattr__ = %s µs" % mlt)
+            info("DataModel.__getattr__ = %s µs" % mlt)
             self.assertTrue(mlt<10)
 
             x = lambda: s3db["pr_person"]
             mlt = timeit.Timer(x).timeit()
-            info("S3Model.__getitem__ = %s µs" % mlt)
+            info("DataModel.__getitem__ = %s µs" % mlt)
             self.assertTrue(mlt<10)
 
-    def testS3ModelName(self):
+    def testDataModelName(self):
 
         s3db = current.s3db
 
@@ -115,25 +115,25 @@ class S3PerformanceTests(unittest.TestCase):
         if func is not None:
             x = lambda: s3db.table("pr_person_represent")
             mlt = timeit.Timer(x).timeit()
-            info("S3Model.table(non-table) = %s µs" % mlt)
+            info("DataModel.table(non-table) = %s µs" % mlt)
             self.assertTrue(mlt<10)
 
             x = lambda: s3db.get("pr_person_represent")
             mlt = timeit.Timer(x).timeit()
-            info("S3Model.get(non-table) = %s µs" % mlt)
+            info("DataModel.get(non-table) = %s µs" % mlt)
             self.assertTrue(mlt<10)
 
             x = lambda: s3db.pr_person_represent
             mlt = timeit.Timer(x).timeit()
-            info("S3Model.__getattr__(non-table) = %s µs" % mlt)
+            info("DataModel.__getattr__(non-table) = %s µs" % mlt)
             self.assertTrue(mlt<10)
 
             x = lambda: s3db["pr_person_represent"]
             mlt = timeit.Timer(x).timeit()
-            info("S3Model.__getitem__(non-table) = %s µs" % mlt)
+            info("DataModel.__getitem__(non-table) = %s µs" % mlt)
             self.assertTrue(mlt<10)
 
-    def testS3ModelConfigure(self):
+    def testDataModelConfigure(self):
 
         s3db = current.s3db
 
@@ -141,38 +141,38 @@ class S3PerformanceTests(unittest.TestCase):
         configure = s3db.configure
         x = lambda: configure("pr_person", testconfig = "Test")
         mlt = timeit.Timer(x).timeit()
-        info("S3Model.configure = %s µs" % mlt)
+        info("DataModel.configure = %s µs" % mlt)
         self.assertTrue(mlt<10)
 
         get_config = s3db.get_config
         x = lambda: get_config("pr_person", "testconfig")
         mlt = timeit.Timer(x).timeit()
-        info("S3Model.get_config = %s µs" % mlt)
+        info("DataModel.get_config = %s µs" % mlt)
         self.assertTrue(mlt<10)
 
-    def testS3ResourceInit(self):
+    def testCRUDResourceInit(self):
 
         info("")
         current.auth.override = True
         current.s3db.resource("pr_person")
         x = lambda: current.s3db.resource("pr_person")
         mlt = timeit.Timer(x).timeit(number=1000)
-        info("S3Resource.__init__ = %s ms" % mlt)
+        info("CRUDResource.__init__ = %s ms" % mlt)
         self.assertTrue(mlt<10)
         current.auth.override = False
 
-    def testS3ResourceLoad(self):
+    def testCRUDResourceLoad(self):
 
         info("")
         current.auth.override = True
         resource = current.s3db.resource("pr_person")
         x = lambda: resource.load(limit=1)
         mlt = timeit.Timer(x).timeit(number=1000)
-        info("S3Resource.load = %s ms" % mlt)
+        info("CRUDResource.load = %s ms" % mlt)
         self.assertTrue(mlt<10)
         current.auth.override = False
 
-    def testS3ResourceImportExport(self):
+    def testCRUDResourceImportExport(self):
 
         xmlstr = """
 <s3xml>
@@ -254,7 +254,7 @@ class S3PerformanceTests(unittest.TestCase):
             mlt += timeit.Timer(x).timeit(number=1)
             current.db.rollback()
         mlt *= 10
-        info("S3Resource.import_xml = %s ms (=%s rec/sec)" % (mlt, int(1000/mlt)))
+        info("CRUDResource.import_xml = %s ms (=%s rec/sec)" % (mlt, int(1000/mlt)))
         self.assertTrue(mlt<30)
 
         resource = current.s3db.resource("pr_person")
@@ -267,7 +267,7 @@ class S3PerformanceTests(unittest.TestCase):
                                             parent=parent,
                                             export_map=Storage())
         mlt = timeit.Timer(x).timeit(number=1000)
-        info("S3Resource.export (incl. DB extraction) = %s ms (=%s rec/sec)" % (mlt, int(1000/mlt)))
+        info("CRUDResource.export (incl. DB extraction) = %s ms (=%s rec/sec)" % (mlt, int(1000/mlt)))
         self.assertTrue(mlt<10)
 
         resource = current.s3db.resource("pr_person")
@@ -281,7 +281,7 @@ class S3PerformanceTests(unittest.TestCase):
                                             parent=parent,
                                             export_map=Storage())
         mlt = timeit.Timer(x).timeit(number=1000)
-        info("S3Resource.export (w/o DB extraction) = %s ms (=%s rec/sec)" % (mlt, int(1000/mlt)))
+        info("CRUDResource.export (w/o DB extraction) = %s ms (=%s rec/sec)" % (mlt, int(1000/mlt)))
         self.assertTrue(mlt<10)
 
         current.auth.override = False

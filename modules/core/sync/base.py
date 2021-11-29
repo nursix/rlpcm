@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
+"""
+    Synchronization between Eden instances
 
-""" S3 Synchronization
-
-    @copyright: 2011-2021 (c) Sahana Software Foundation
-    @license: MIT
+    Copyright: 2011-2021 (c) Sahana Software Foundation
 
     Permission is hereby granted, free of charge, to any person
     obtaining a copy of this software and associated documentation
@@ -36,18 +34,17 @@ from io import BytesIO
 from gluon import current, URL, DIV
 from gluon.storage import Storage
 
-from ..filters import S3URLQuery
-from ..service import S3Method
+from ..resource import S3URLQuery, SyncPolicy
+from ..methods import CRUDMethod, S3CRUD
 from ..tools import s3_parse_datetime, s3_utc, s3_str
 
 # =============================================================================
-class S3Sync(S3Method):
+class S3Sync(CRUDMethod):
     """ Synchronization Handler """
 
     def __init__(self):
-        """ Constructor """
 
-        S3Method.__init__(self)
+        super(S3Sync, self).__init__()
 
         self.log = S3SyncLog()
         self._config = None
@@ -55,16 +52,18 @@ class S3Sync(S3Method):
     # -------------------------------------------------------------------------
     def apply_method(self, r, **attr):
         """
-            RESTful method handler, responds to:
+            CRUD method handler, responds to:
                 - GET [prefix]/[name]/sync.xml          - incoming pull
                 - PUT|POST [prefix]/[name]/sync.xml     - incoming push
                 - POST sync/repository/register.json    - remote registration
 
-            NB incoming pull/push reponse normally by local sync/sync
-               controller as resource proxy => back-end generated S3Request
+            Args:
+                r: the CRUDRequest
+                attr: controller parameters for the request
 
-            @param r: the S3Request
-            @param attr: controller parameters for the request
+            Note:
+                incoming pull/push reponse normally by local sync/sync
+                controller as resource proxy => back-end generated CRUDRequest
         """
 
         output = {}
@@ -107,8 +106,9 @@ class S3Sync(S3Method):
         """
             Respond to an incoming registration request
 
-            @param r: the S3Request
-            @param attr: controller parameters for the request
+            Args:
+                r: the CRUDRequest
+                attr: controller parameters for the request
         """
 
         # Parse the request parameters
@@ -206,8 +206,9 @@ class S3Sync(S3Method):
         """
             Respond to an incoming pull
 
-            @param r: the S3Request
-            @param attr: the controller attributes
+            Args:
+                r: the CRUDRequest
+                attr: the controller attributes
         """
 
         mixed =  attr.get("mixed", False)
@@ -309,11 +310,12 @@ class S3Sync(S3Method):
         """
             Respond to an incoming push
 
-            @param r: the S3Request
-            @param attr: the controller attributes
+            Args:
+                r: the CRUDRequest
+                attr: the controller attributes
         """
 
-        from ..methods import S3ImportItem
+        from ..resource import ImportItem
 
         mixed = attr.get("mixed", False)
         get_vars = r.get_vars
@@ -343,8 +345,8 @@ class S3Sync(S3Method):
                                                         ))
 
         # Get strategy and policy
-        default_update_policy = S3ImportItem.POLICY.NEWER
-        default_conflict_policy = S3ImportItem.POLICY.MASTER
+        default_update_policy = SyncPolicy.NEWER
+        default_conflict_policy = SyncPolicy.MASTER
 
         # Identify the synchronization task
         ttable = s3db.sync_task
@@ -361,32 +363,27 @@ class S3Sync(S3Method):
             strategy = task.strategy
             update_policy = task.update_policy or default_update_policy
             conflict_policy = task.conflict_policy or default_conflict_policy
-            if update_policy not in ("THIS", "OTHER"):
+            if update_policy not in (SyncPolicy.THIS, SyncPolicy.OTHER):
                 last_sync = task.last_pull
 
         else:
-            policies = S3ImportItem.POLICY
+            policies = {SyncPolicy.THIS: SyncPolicy.OTHER,
+                        SyncPolicy.OTHER: SyncPolicy.THIS,
+                        SyncPolicy.NEWER: SyncPolicy.NEWER,
+                        SyncPolicy.MASTER: SyncPolicy.MASTER,
+                        }
             p = get_vars.get("update_policy", None)
-            values = {"THIS": "OTHER", "OTHER": "THIS"}
-            switch = lambda p: p in values and values[p] or p
-            if p and p in policies:
-                p = switch(p)
-                update_policy = policies[p]
-            else:
-                update_policy = default_update_policy
+            update_policy = policies.get(p) if p else default_update_policy
             p = get_vars.get("conflict_policy", None)
-            if p and p in policies:
-                p = switch(p)
-                conflict_policy = policies[p]
-            else:
-                conflict_policy = default_conflict_policy
+            conflict_policy = policies.get(p) if p else default_conflict_policy
+
             msince = get_vars.get("msince", None)
             if msince is not None:
                 last_sync = s3_parse_datetime(msince)
             s = get_vars.get("strategy", None)
             if s:
                 s = str(s).split(",")
-                methods = S3ImportItem.METHOD
+                methods = ImportItem.METHOD
                 strategy = [method for method in methods.values()
                                    if method in s]
             else:
@@ -436,9 +433,11 @@ class S3Sync(S3Method):
         """
             Synchronize with a repository, called from scheduler task
 
-            @param repository: the repository Row
+            Args:
+                repository: the repository Row
 
-            @return: True if successful, False if there was an error
+            Returns:
+                True if successful, False if there was an error
         """
 
         current.log.debug("S3Sync: synchronize %s" % repository.url)
@@ -548,12 +547,11 @@ class S3Sync(S3Method):
         """
             Automatic conflict resolution
 
-            @param item: the conflicting import item
-            @param repository: the repository the item comes from
-            @param resource: the resource the item shall be imported to
+            Args:
+                item: the conflicting import item
+                repository: the repository the item comes from
+                resource: the resource the item shall be imported to
         """
-
-        from ..methods import S3ImportItem
 
         s3db = current.s3db
         debug = current.log.debug
@@ -576,7 +574,6 @@ class S3Sync(S3Method):
         else:
             debug("Applying default rule")
             ttable = s3db.sync_task
-            policies = S3ImportItem.POLICY
             query = (ttable.repository_id == repository.id) & \
                     (ttable.resource_name == tablename) & \
                     (ttable.deleted == False)
@@ -584,11 +581,11 @@ class S3Sync(S3Method):
             if task and item.original:
                 original = item.original
                 conflict_policy = task.conflict_policy
-                if conflict_policy == policies.OTHER:
+                if conflict_policy == SyncPolicy.OTHER:
                     # Always accept
                     debug("Accept by default")
                     item.conflict = False
-                elif conflict_policy == policies.NEWER:
+                elif conflict_policy == SyncPolicy.NEWER:
                     # Accept if newer
                     xml = current.xml
                     if xml.MTIME in original and \
@@ -597,7 +594,7 @@ class S3Sync(S3Method):
                         item.conflict = False
                     else:
                         debug("Do not accept")
-                elif conflict_policy == policies.MASTER:
+                elif conflict_policy == SyncPolicy.MASTER:
                     # Accept if master
                     if current.xml.MCI in original and \
                        original.mci == 0 or item.mci == 1:
@@ -619,11 +616,13 @@ class S3Sync(S3Method):
         """
             Create an archive for a data set
 
-            @param dataset_id: the data set record ID
-            @param task_id: the scheduler task ID if the archive is
-                            created asynchronously
+            Args:
+                dataset_id: the data set record ID
+                task_id: the scheduler task ID if the archive is
+                         created asynchronously
 
-            @return: error message if an error occured, otherwise None
+            Returns:
+                error message if an error occured, otherwise None
         """
 
         db = current.db
@@ -781,8 +780,11 @@ class S3Sync(S3Method):
         """
             Get all filters for a synchronization task
 
-            @param task_id: the task ID
-            @return: a dict of dicts like {tablename: {url_var: value}}
+            Args:
+                task_id: the task ID
+
+            Returns:
+                a dict of dicts like {tablename: {url_var: value}}
         """
 
         db = current.db
@@ -811,7 +813,7 @@ class S3Sync(S3Method):
         return filters
 
 # =============================================================================
-class S3SyncLog(S3Method):
+class S3SyncLog(CRUDMethod):
     """ Synchronization Logger """
 
     TABLENAME = "sync_log"
@@ -838,17 +840,18 @@ class S3SyncLog(S3Method):
     # -------------------------------------------------------------------------
     def apply_method(self, r, **attr):
         """
-            RESTful method handler
+            Apply method
 
-            @param r: the S3Request instance
-            @param attr: controller attributes for the request
+            Args:
+                r: the CRUDRequest instance
+                attr: controller attributes for the request
         """
 
         output = {}
 
         resource = r.resource
         if resource.tablename == self.TABLENAME:
-            return resource.crud.select(r, **attr)
+            return S3CRUD().select(r, **attr)
 
         elif resource.tablename == "sync_repository":
             # READ for sync log for this repository (currently not needed)
@@ -895,15 +898,16 @@ class S3SyncLog(S3Method):
         """
             Writes a new entry to the log
 
-            @param repository_id: the repository record ID
-            @param resource_name: the resource name
-            @param transmission: transmission mode (IN, OUT or None)
-            @param mode: synchronization mode (PULL, PUSH or None)
-            @param action: action that triggers the log entry (if any)
-            @param result: the result of the transaction
-                           (SUCCESS, WARNING, ERROR or FATAL)
-            @param remote: boolean, True if this is a remote error
-            @param message: clear text message
+            Args:
+                repository_id: the repository record ID
+                resource_name: the resource name
+                transmission: transmission mode (IN, OUT or None)
+                mode: synchronization mode (PULL, PUSH or None)
+                action: action that triggers the log entry (if any)
+                result: the result of the transaction
+                        ("SUCCESS", "WARNING", "ERROR" or "FATAL")
+                remote: boolean, True if this is a remote error
+                message: clear text message
         """
 
         if result not in (cls.SUCCESS, cls.WARNING, cls.ERROR, cls.FATAL):
@@ -945,14 +949,13 @@ class S3SyncLog(S3Method):
             return None
 
 # =============================================================================
-class S3SyncRepository(object):
+class S3SyncRepository:
     """ Class representation of a peer repository """
 
     def __init__(self, repository):
         """
-            Constructor
-
-            @param repository: the repository record (Row)
+            Args:
+                repository: the repository record (Row)
         """
 
         # Logger and Config
@@ -1016,7 +1019,8 @@ class S3SyncRepository(object):
         """
             Delegate other attributes and methods to the adapter
 
-            @param name: the attribute/method
+            Args:
+                name: the attribute/method
         """
 
         return object.__getattribute__(self.adapter, name)
@@ -1033,7 +1037,7 @@ class S3SyncRepository(object):
         self.archives = {}
 
 # =============================================================================
-class S3SyncBaseAdapter(object):
+class S3SyncBaseAdapter:
     """
         Sync Adapter (base class) - interface providing standard
         synchronization methods for the respective repository type.
@@ -1044,9 +1048,8 @@ class S3SyncBaseAdapter(object):
 
     def __init__(self, repository):
         """
-            Constructor
-
-            @param repository: the repository (S3Repository instance)
+            Args:
+                repository: the repository (S3Repository)
         """
 
         self.repository = repository
@@ -1061,8 +1064,9 @@ class S3SyncBaseAdapter(object):
         """
             Register this site at the peer repository
 
-            @return: True|False to indicate success|failure,
-                     or None if registration is not required
+            Returns:
+                True|False to indicate success|failure,
+                or None if registration is not required
         """
 
         raise NotImplementedError
@@ -1072,7 +1076,8 @@ class S3SyncBaseAdapter(object):
         """
             Login at the peer repository
 
-            @return: None if successful, otherwise the error
+            Returns:
+                None if successful, otherwise the error
         """
 
         raise NotImplementedError
@@ -1083,12 +1088,14 @@ class S3SyncBaseAdapter(object):
             Fetch updates from the peer repository and import them
             into the local database (active pull)
 
-            @param task: the synchronization task (sync_task Row)
-            @param onconflict: callback for automatic conflict resolution
+            Args:
+                task: the synchronization task (sync_task Row)
+                onconflict: callback for automatic conflict resolution
 
-            @return: tuple (error, mtime), with error=None if successful,
-                     else error=message, and mtime=modification timestamp
-                     of the youngest record sent
+            Returns:
+                tuple (error, mtime), with error=None if successful,
+                else error=message, and mtime=modification timestamp
+                of the youngest record sent
         """
 
         raise NotImplementedError
@@ -1099,11 +1106,13 @@ class S3SyncBaseAdapter(object):
             Extract new updates from the local database and send
             them to the peer repository (active push)
 
-            @param task: the synchronization task (sync_task Row)
+            Args:
+                task: the synchronization task (sync_task Row)
 
-            @return: tuple (error, mtime), with error=None if successful,
-                     else error=message, and mtime=modification timestamp
-                     of the youngest record sent
+            Returns:
+                tuple (error, mtime), with error=None if successful,
+                else error=message, and mtime=modification timestamp
+                of the youngest record sent
         """
 
         raise NotImplementedError
@@ -1121,19 +1130,21 @@ class S3SyncBaseAdapter(object):
         """
             Respond to an incoming pull from the peer repository
 
-            @param resource: the resource to be synchronized
-            @param start: index of the first record to send
-            @param limit: maximum number of records to send
-            @param msince: minimum modification date/time for records to send
-            @param filters: URL filters for record extraction
-            @param mixed: negotiate resource with peer (disregard resource)
-            @param pretty_print: make the output human-readable
+            Args:
+                resource: the resource to be synchronized
+                start: index of the first record to send
+                limit: maximum number of records to send
+                msince: minimum modification date/time for records to send
+                filters: URL filters for record extraction
+                mixed: negotiate resource with peer (disregard resource)
+                pretty_print: make the output human-readable
 
-            @return: a dict {status, remote, message, response}, with:
-                        - status....the outcome of the operation
-                        - remote....whether the error was remote (or local)
-                        - message...the log message
-                        - response..the response to send to the peer
+            Returns:
+                a dict {status, remote, message, response}, with:
+                    - status....the outcome of the operation
+                    - remote....whether the error was remote (or local)
+                    - message...the log message
+                    - response..the response to send to the peer
         """
 
         raise NotImplementedError
@@ -1151,26 +1162,28 @@ class S3SyncBaseAdapter(object):
         """
             Respond to an incoming push from the peer repository
 
-            @param source: the input stream (list of file-like objects)
-            @param resource: the target resource
-            @param strategy: the import strategy
-            @param update_policy: the update policy
-            @param conflict_policy: the conflict resolution policy
-            @param onconflict: callback for conflict resolution
-            @param last_sync: the last synchronization date/time for the peer
-            @param mixed: negotiate resource with peer (disregard resource)
+            Args:
+                source: the input stream (list of file-like objects)
+                resource: the target resource
+                strategy: the import strategy
+                update_policy: the update policy
+                conflict_policy: the conflict resolution policy
+                onconflict: callback for conflict resolution
+                last_sync: the last synchronization date/time for the peer
+                mixed: negotiate resource with peer (disregard resource)
 
-            @return: a dict {status, remote, message, response}, with:
-                        - status....the outcome of the operation
-                        - remote....whether the error was remote (or local)
-                        - message...the log message
-                        - response..the response to send to the peer
+            Returns:
+                a dict {status, remote, message, response}, with:
+                    - status....the outcome of the operation
+                    - remote....whether the error was remote (or local)
+                    - message...the log message
+                    - response..the response to send to the peer
         """
 
         raise NotImplementedError
 
 # =============================================================================
-class S3SyncDataArchive(object):
+class S3SyncDataArchive:
     """
         Simple abstraction layer for (compressed) data archives, currently
         based on zipfile (Python standard library). Compression additionally
@@ -1181,10 +1194,10 @@ class S3SyncDataArchive(object):
         """
             Create or open an archive
 
-            @param fileobj: the file object containing the archive,
-                            None to create a new archive
-            @param compress: enable (or suppress) compression of new
-                             archives
+            Args:
+                fileobj: the file object containing the archive,
+                         None to create a new archive
+                compress: enable (or suppress) compression of new archives
         """
 
         import zipfile
@@ -1222,15 +1235,17 @@ class S3SyncDataArchive(object):
         """
             Add an object to the archive
 
-            @param name: the file name for the object inside the archive
-            @param obj: the object to add (string or file-like object)
+            Args:
+                name: the file name for the object inside the archive
+                obj: the object to add (string or file-like object)
 
-            @raises UserWarning: when adding a duplicate name (overwrites
-                                 the existing object in the archive)
-            @raises RuntimeError: if the archive is not writable, or
-                                  no valid object name has been provided
-            @raises TypeError: if the object is not a unicode, str or
-                               file-like object
+            Raises:
+                UserWarning: when adding a duplicate name (overwrites
+                             the existing object in the archive)
+                RuntimeError: if the archive is not writable, or
+                              no valid object name has been provided
+                TypeError: if the object is not a unicode, str or
+                           file-like object
         """
 
         # Make sure the object name is an utf-8 encoded str
@@ -1260,10 +1275,12 @@ class S3SyncDataArchive(object):
         """
             Extract an object from the archive by name
 
-            @param name: the object name
+            Args:
+                name: the object name
 
-            @return: the object as file-like object, or None if
-                     the object could not be found in the archive
+            Returns:
+                the object as file-like object, or None if
+                the object could not be found in the archive
         """
 
         if not self.archive:
@@ -1281,7 +1298,8 @@ class S3SyncDataArchive(object):
             Close the archive and return it as file-like object; no further
             add/extract operations will be possible after closing.
 
-            @return: the file-like object containing the archive
+            Returns:
+                the file-like object containing the archive
         """
 
         if self.archive:

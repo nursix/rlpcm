@@ -1,11 +1,9 @@
-# -*- coding: utf-8 -*-
+"""
+    Data Collection Models
+    - a front-end UI to manage Assessments which uses the
+      Dynamic Tables back-end
 
-""" Sahana Eden Data Collection Models
-    - a front-end UI to manage Assessments which uses the Dynamic Tables
-      back-end
-
-    @copyright: 2014-2021 (c) Sahana Software Foundation
-    @license: MIT
+    Copyright: 2014-2021 (c) Sahana Software Foundation
 
     Permission is hereby granted, free of charge, to any person
     obtaining a copy of this software and associated documentation
@@ -48,7 +46,7 @@ from s3layouts import S3PopupLink
 SEPARATORS = (",", ":")
 
 # =============================================================================
-class DataCollectionTemplateModel(S3Model):
+class DataCollectionTemplateModel(DataModel):
     """
         Templates to use for Assessments / Surveys
         - uses the Dynamic Tables back-end to store Questions
@@ -91,7 +89,7 @@ class DataCollectionTemplateModel(S3Model):
                      Field("master", length=32,
                            default = "dc_response",
                            label = T("Used for"),
-                           represent = S3Represent(options = master_opts),
+                           represent = represent_option(master_opts),
                            requires = IS_IN_SET(master_opts),
                            # Either set via Controller or on Import
                            readable = False,
@@ -260,7 +258,7 @@ class DataCollectionTemplateModel(S3Model):
                      Field("field_type", "integer", notnull=True,
                            default = 1, # string
                            label = T("Field Type"),
-                           represent = S3Represent(options = type_opts),
+                           represent = represent_option(type_opts),
                            requires = IS_IN_SET(type_opts),
                            ),
                      Field("options", "json",
@@ -977,7 +975,7 @@ class DataCollectionTemplateModel(S3Model):
         write_dict(w2pfilename, translations)
 
 # =============================================================================
-class DataCollectionModel(S3Model):
+class DataCollectionModel(DataModel):
     """
         Results of Assessments / Surveys
         - uses the Dynamic Tables back-end to store Answers
@@ -1047,7 +1045,7 @@ class DataCollectionModel(S3Model):
                      Field("status", "integer",
                            default = default_status,
                            label = T("Status"),
-                           represent = S3Represent(options = status_opts),
+                           represent = represent_option(status_opts),
                            requires = IS_IN_SET(status_opts),
                            readable = target_status,
                            writable = target_status,
@@ -1114,7 +1112,7 @@ class DataCollectionModel(S3Model):
             msg_record_deleted = T("Data Collection Target deleted"),
             msg_list_empty = T("No Data Collection Targets currently registered"))
 
-        self.set_method("dc", "target",
+        self.set_method("dc_target",
                         method = "results",
                         action = dc_TargetReport())
 
@@ -1526,7 +1524,7 @@ class DataCollectionModel(S3Model):
                 s3.scripts.append("/%s/static/scripts/S3/s3.dc_answer.min.js" % r.application)
 
 # =============================================================================
-class dc_TargetReport(S3Method):
+class dc_TargetReport(CRUDMethod):
     """
         Display a Summary of the Target (i.e. collection of Responses)
 
@@ -1541,10 +1539,11 @@ class dc_TargetReport(S3Method):
     # -------------------------------------------------------------------------
     def apply_method(self, r, **attr):
         """
-            Entry point for REST API
+            Applies the method (controller entry point).
 
-            @param r: the S3Request
-            @param attr: controller arguments
+            Args:
+                r: the CRUDRequest
+                attr: controller arguments
         """
 
         if r.name == "target":
@@ -1837,7 +1836,7 @@ class dc_TargetReport(S3Method):
                    (original is project_SummaryReport)
         """
 
-        from core.io.codecs.pdf import EdenDocTemplate, S3RL_PDF
+        from core.resource.codecs.pdf import EdenDocTemplate, S3RL_PDF
 
         T = current.T
         table = r.table
@@ -1884,11 +1883,12 @@ class dc_TargetReport(S3Method):
         return doc.output.getvalue()
 
 # =============================================================================
-class dc_TargetXLS(S3Method):
+class dc_TargetXLS(CRUDMethod):
 
+    # -------------------------------------------------------------------------
     def apply_method(self, r, **attr):
 
-        from core.io.codecs.xls import S3XLS
+        from core.resource.codecs.xls import S3XLS
 
         try:
             import xlwt

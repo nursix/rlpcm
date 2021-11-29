@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
+"""
+    Hospital Management System Model
 
-""" Sahana Eden Hospital Management System Model
-
-    @copyright: 2009-2021 (c) Sahana Software Foundation
-    @license: MIT
+    Copyright: 2009-2021 (c) Sahana Software Foundation
 
     Permission is hereby granted, free of charge, to any person
     obtaining a copy of this software and associated documentation
@@ -28,7 +26,7 @@
 """
 
 __all__ = ("HospitalDataModel",
-           "CholeraTreatmentCapabilityModel",
+           "HospitalCTCModel",
            "HospitalActivityReportModel",
            "hms_hospital_rheader"
            )
@@ -41,7 +39,7 @@ from s3dal import Row
 from s3layouts import S3PopupLink
 
 # =============================================================================
-class HospitalDataModel(S3Model):
+class HospitalDataModel(DataModel):
 
     names = ("hms_hospital",
              "hms_contact",
@@ -412,7 +410,7 @@ class HospitalDataModel(S3Model):
                            )
 
         # Custom Method to Assign HRs
-        self.set_method("hms", "hospital",
+        self.set_method("hms_hospital",
                         method = "assign",
                         action = self.hrm_AssignMethod(component="human_resource_site"))
 
@@ -985,7 +983,7 @@ class HospitalDataModel(S3Model):
                                                 available_beds=a_beds)
 
 # =============================================================================
-class CholeraTreatmentCapabilityModel(S3Model):
+class HospitalCTCModel(DataModel):
 
     names = ("hms_ctc",)
 
@@ -1124,15 +1122,15 @@ class CholeraTreatmentCapabilityModel(S3Model):
         # ---------------------------------------------------------------------
         # Return global names to s3db
         #
-        return {}
+        return None
 
     # -------------------------------------------------------------------------
     def defaults(self):
 
-        return {}
+        return None
 
 # =============================================================================
-class HospitalActivityReportModel(S3Model):
+class HospitalActivityReportModel(DataModel):
 
     names = ("hms_activity",)
 
@@ -1216,12 +1214,12 @@ class HospitalActivityReportModel(S3Model):
         # ---------------------------------------------------------------------
         # Return global names to s3db
         #
-        return {}
+        return None
 
     # -------------------------------------------------------------------------
     def defaults(self):
 
-        return {}
+        return None
 
     # -------------------------------------------------------------------------
     @staticmethod

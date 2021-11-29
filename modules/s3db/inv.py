@@ -51,6 +51,8 @@ __all__ = ("InvWarehouseModel",
 
 import datetime
 
+from collections import OrderedDict
+
 from gluon import *
 from gluon.sqlhtml import RadioWidget
 from gluon.storage import Storage
@@ -117,7 +119,7 @@ def inv_itn_label():
     return current.T("CTN")
 
 # =============================================================================
-class InvWarehouseModel(S3Model):
+class InvWarehouseModel(DataModel):
 
     names = ("inv_warehouse",
              "inv_warehouse_type",
@@ -393,7 +395,7 @@ class InvWarehouseModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -405,7 +407,7 @@ class InvWarehouseModel(S3Model):
         current.s3db.org_update_affiliations("inv_warehouse", form.vars)
 
 # =============================================================================
-class InventoryModel(S3Model):
+class InventoryModel(DataModel):
     """
         Inventory Management
 
@@ -491,7 +493,7 @@ class InventoryModel(S3Model):
                           Field("status", "integer",
                                 default = 0, # Only Items with this Status can be allocated to Outgoing Shipments
                                 label = T("Status"),
-                                represent = S3Represent(options = inv_item_status_opts),
+                                represent = represent_option(inv_item_status_opts),
                                 requires = IS_EMPTY_OR(
                                             IS_IN_SET(inv_item_status_opts)
                                             ),
@@ -532,7 +534,7 @@ class InventoryModel(S3Model):
                           Field("source_type", "integer",
                                 default = 0,
                                 label = T("Type"),
-                                represent = S3Represent(options = inv_source_type),
+                                represent = represent_option(inv_source_type),
                                 requires = IS_EMPTY_OR(
                                             IS_IN_SET(inv_source_type)
                                             ),
@@ -888,7 +890,8 @@ $.filterOptionsS3({
         """
             Update detection for inv_inv_item
 
-            @param item: the S3ImportItem
+            Args:
+                item: the ImportItem
         """
 
         table = item.table
@@ -928,7 +931,7 @@ $.filterOptionsS3({
                 item.data.quantity = duplicate.quantity
 
 # =============================================================================
-class InventoryTrackingModel(S3Model):
+class InventoryTrackingModel(DataModel):
     """
         A module to manage the shipment of inventory items
         - Sent Items
@@ -1052,7 +1055,7 @@ class InventoryTrackingModel(S3Model):
                      Field("type", "integer",
                            default = type_default,
                            label = T("Shipment Type"),
-                           represent = S3Represent(options = send_type_opts),
+                           represent = represent_option(send_type_opts),
                            requires = IS_IN_SET(send_type_opts),
                            readable = not type_default,
                            writable = not type_default,
@@ -1149,7 +1152,7 @@ class InventoryTrackingModel(S3Model):
                      Field("status", "integer",
                            default = SHIP_STATUS_IN_PROCESS,
                            label = T("Status"),
-                           represent = S3Represent(options = shipment_status),
+                           represent = represent_option(shipment_status),
                            requires = IS_EMPTY_OR(
                                         IS_IN_SET(shipment_status)
                                       ),
@@ -1159,7 +1162,7 @@ class InventoryTrackingModel(S3Model):
                            requires = IS_EMPTY_OR(
                                         IS_IN_SET(ship_doc_status)
                                        ),
-                           represent = S3Represent(options = ship_doc_status),
+                           represent = represent_option(ship_doc_status),
                            default = SHIP_DOC_PENDING,
                            widget = radio_widget,
                            label = T("Filing Status"),
@@ -1249,11 +1252,11 @@ class InventoryTrackingModel(S3Model):
 
         # Custom methods
         # Generate Consignment Note
-        set_method("inv", "send",
+        set_method("inv_send",
                    method = "form",
                    action = self.inv_send_form)
 
-        set_method("inv", "send",
+        set_method("inv_send",
                    method = "timeline",
                    action = self.inv_timeline)
 
@@ -1331,7 +1334,7 @@ class InventoryTrackingModel(S3Model):
                                 ),
                      Field("type", "integer",
                            requires = IS_IN_SET(recv_type_opts),
-                           represent = S3Represent(options = recv_type_opts),
+                           represent = represent_option(recv_type_opts),
                            label = T("Shipment Type"),
                            default = 0,
                            ),
@@ -1392,7 +1395,7 @@ class InventoryTrackingModel(S3Model):
                            requires = IS_EMPTY_OR(
                                         IS_IN_SET(shipment_status)
                                         ),
-                           represent = S3Represent(options = shipment_status),
+                           represent = represent_option(shipment_status),
                            default = SHIP_STATUS_IN_PROCESS,
                            label = T("Status"),
                            writable = False,
@@ -1401,7 +1404,7 @@ class InventoryTrackingModel(S3Model):
                            requires = IS_EMPTY_OR(
                                        IS_IN_SET(ship_doc_status)
                                        ),
-                           represent = S3Represent(options = ship_doc_status),
+                           represent = represent_option(ship_doc_status),
                            default = SHIP_DOC_PENDING,
                            widget = radio_widget,
                            label = T("%(GRN)s Status") % {"GRN": recv_shortname},
@@ -1417,7 +1420,7 @@ class InventoryTrackingModel(S3Model):
                            requires = IS_EMPTY_OR(
                                         IS_IN_SET(ship_doc_status)
                                        ),
-                           represent = S3Represent(options = ship_doc_status),
+                           represent = represent_option(ship_doc_status),
                            default = SHIP_DOC_PENDING,
                            widget = radio_widget,
                            label = T("Certificate Status"),
@@ -1429,7 +1432,7 @@ class InventoryTrackingModel(S3Model):
                            requires = IS_EMPTY_OR(
                                         IS_IN_SET(ship_doc_status)
                                        ),
-                           represent = S3Represent(options = ship_doc_status),
+                           represent = represent_option(ship_doc_status),
                            default = SHIP_DOC_PENDING,
                            widget = radio_widget,
                            label = T("Filing Status"),
@@ -1564,15 +1567,15 @@ class InventoryTrackingModel(S3Model):
 
         # Custom methods
         # Print Forms
-        set_method("inv", "recv",
+        set_method("inv_recv",
                    method = "form",
                    action = self.inv_recv_form)
 
-        set_method("inv", "recv",
+        set_method("inv_recv",
                    method = "cert",
                    action = self.inv_recv_donation_cert)
 
-        set_method("inv", "recv",
+        set_method("inv_recv",
                    method = "timeline",
                    action = self.inv_timeline)
 
@@ -1830,7 +1833,7 @@ $.filterOptionsS3({
                      Field("inv_item_status", "integer",
                            default = 0,
                            label = T("Item Status"),
-                           represent = S3Represent(options = inv_item_status_opts),
+                           represent = represent_option(inv_item_status_opts),
                            requires = IS_EMPTY_OR(
                                         IS_IN_SET(inv_item_status_opts)
                                         ),
@@ -1838,7 +1841,7 @@ $.filterOptionsS3({
                      Field("status", "integer",
                            default = 1,
                            label = T("Item Tracking Status"),
-                           represent = S3Represent(options = tracking_status),
+                           represent = represent_option(tracking_status),
                            required = True,
                            requires = IS_IN_SET(tracking_status),
                            writable = False,
@@ -4058,7 +4061,7 @@ def inv_recv_pdf_footer(r):
     return None
 
 # =============================================================================
-class InventoryAdjustModel(S3Model):
+class InventoryAdjustModel(DataModel):
     """
         A module to manage the shipment of inventory items
         - Sent Items
@@ -4127,14 +4130,14 @@ class InventoryAdjustModel(S3Model):
                              ),
                      Field("status", "integer",
                            requires = IS_EMPTY_OR(IS_IN_SET(adjust_status)),
-                           represent = S3Represent(options = adjust_status),
+                           represent = represent_option(adjust_status),
                            default = 0,
                            label = T("Status"),
                            writable = False
                            ),
                      Field("category", "integer",
                            requires = IS_EMPTY_OR(IS_IN_SET(adjust_type)),
-                           represent = S3Represent(options = adjust_type),
+                           represent = represent_option(adjust_type),
                            default = 1,
                            label = T("Type"),
                            writable = False,
@@ -4236,7 +4239,7 @@ class InventoryAdjustModel(S3Model):
                      Field("reason", "integer",
                            default = 1,
                            label = T("Reason"),
-                           represent = S3Represent(options = adjust_reason),
+                           represent = represent_option(adjust_reason),
                            requires = IS_IN_SET(adjust_reason),
                            writable = False,
                            ),
@@ -4255,14 +4258,14 @@ class InventoryAdjustModel(S3Model):
                      Field("old_status", "integer",
                            default = 0,
                            label = T("Current Status"),
-                           represent = S3Represent(options = inv_item_status_opts),
+                           represent = represent_option(inv_item_status_opts),
                            requires = IS_EMPTY_OR(IS_IN_SET(inv_item_status_opts)),
                            writable = False,
                            ),
                      Field("new_status", "integer",
                            default = 0,
                            label = T("Revised Status"),
-                           represent = S3Represent(options = inv_item_status_opts),
+                           represent = represent_option(inv_item_status_opts),
                            requires = IS_EMPTY_OR(IS_IN_SET(inv_item_status_opts)),
                            ),
                      s3_date("expiry_date",
@@ -4455,7 +4458,8 @@ def inv_item_total_weight(row):
     """
         Compute the total weight of an inventory item (Field.Method)
 
-        @param row: the Row
+        Args:
+            row: the Row
     """
 
     try:
@@ -4515,7 +4519,8 @@ def inv_item_total_volume(row):
     """
         Compute the total volume of an inventory item (Field.Method)
 
-        @param row: the Row
+        Args:
+            row: the Row
     """
 
     try:
@@ -4575,16 +4580,18 @@ def inv_stock_movements(resource, selectors, orderby):
     """
         Extraction method for stock movements report
 
-        @param resource: the S3Resource (inv_inv_item)
-        @param selectors: the field selectors
-        @param orderby: orderby expression
+        Args:
+            resource: the CRUDResource (inv_inv_item)
+            selectors: the field selectors
+            orderby: orderby expression
 
-        @note: transactions can be filtered by earliest/latest date
-               using an S3DateFilter with selector="_transaction.date"
+        Note:
+            transactions can be filtered by earliest/latest date
+            using an S3DateFilter with selector="_transaction.date"
 
-        @todo: does not take manual stock adjustments into account
-        @todo: does not represent sites or Waybill/GRN as
-               links (breaks PDF export, but otherwise it's useful)
+        TODO does not take manual stock adjustments into account
+        TODO does not represent sites or Waybill/GRN as
+             links (breaks PDF export, but otherwise it's useful)
     """
 
     # Extract the stock item data
@@ -5139,10 +5146,10 @@ def inv_send_controller():
                            )
 
     s3.prep = prep
-    output = current.rest_controller("inv", "send",
-                                     rheader = inv_send_rheader,
-                                     )
-    return output
+
+    return current.crud_controller("inv", "send",
+                                   rheader = inv_send_rheader,
+                                   )
 
 # =============================================================================
 def inv_send_process():
@@ -5344,9 +5351,6 @@ def inv_expiry_date_represent(date):
 class inv_InvItemRepresent(S3Represent):
 
     def __init__(self):
-        """
-            Constructor
-        """
 
         super(inv_InvItemRepresent, self).__init__(lookup = "inv_inv_item")
 
@@ -5355,9 +5359,10 @@ class inv_InvItemRepresent(S3Represent):
         """
             Custom rows lookup
 
-            @param key: the key Field
-            @param values: the values
-            @param fields: unused (retained for API compatibility)
+            Args:
+                key: the key Field
+                values: the values
+                fields: unused (retained for API compatibility)
         """
 
         s3db = current.s3db
@@ -5395,7 +5400,8 @@ class inv_InvItemRepresent(S3Represent):
         """
             Represent a row
 
-            @param row: the Row
+            Args:
+                row: the Row
         """
 
         itable = current.s3db.inv_inv_item

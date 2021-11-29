@@ -1,11 +1,7 @@
-# -*- coding: utf-8 -*-
+"""
+    Hierarchy Toolkit
 
-""" S3 Hierarchy Toolkit
-
-    @copyright: 2013-2021 (c) Sahana Software Foundation
-    @license: MIT
-
-    @requires: U{B{I{gluon}} <http://web2py.com>}
+    Copyright: 2013-2021 (c) Sahana Software Foundation
 
     Permission is hereby granted, free of charge, to any person
     obtaining a copy of this software and associated documentation
@@ -36,11 +32,12 @@ import json
 
 from gluon import current, DIV, FORM
 
-from ..service import S3Method
-from ..tools import SEPARATORS, S3Hierarchy
+from ..tools import JSONSEPARATORS, S3Hierarchy, get_crud_string
+
+from .base import CRUDMethod
 
 # =============================================================================
-class S3HierarchyCRUD(S3Method):
+class S3HierarchyCRUD(CRUDMethod):
     """ Method handler for hierarchical CRUD """
 
     # -------------------------------------------------------------------------
@@ -48,8 +45,9 @@ class S3HierarchyCRUD(S3Method):
         """
             Entry point for REST interface
 
-            @param r: the S3Request
-            @param attr: controller attributes
+            Args:
+                r: the CRUDRequest
+                attr: controller attributes
         """
 
         if r.http == "GET":
@@ -71,8 +69,9 @@ class S3HierarchyCRUD(S3Method):
         """
             Page load
 
-            @param r: the S3Request
-            @param attr: controller attributes
+            Args:
+                r: the CRUDRequest
+                attr: controller attributes
         """
 
         output = {}
@@ -91,9 +90,9 @@ class S3HierarchyCRUD(S3Method):
 
         # Page title
         if r.record:
-            title = self.crud_string(tablename, "title_display")
+            title = get_crud_string(tablename, "title_display")
         else:
-            title = self.crud_string(tablename, "title_list")
+            title = get_crud_string(tablename, "title_list")
         output["title"] = title
 
         # Build the form
@@ -106,7 +105,7 @@ class S3HierarchyCRUD(S3Method):
 
         # Widget options and scripts
         T = current.T
-        crud_string = lambda name: self.crud_string(tablename, name)
+        crud_string = lambda name: get_crud_string(tablename, name)
 
         widget_opts = {
             "widgetID": widget_id,
@@ -170,8 +169,9 @@ class S3HierarchyCRUD(S3Method):
         """
             Return a single node as JSON (id, parent and label)
 
-            @param r: the S3Request
-            @param attr: controller attributes
+            Args:
+                r: the CRUDRequest
+                attr: controller attributes
         """
 
         resource = self.resource
@@ -207,15 +207,16 @@ class S3HierarchyCRUD(S3Method):
                     data["children"] = nodes
 
         current.response.headers["Content-Type"] = "application/json"
-        return json.dumps(data, separators = SEPARATORS)
+        return json.dumps(data, separators = JSONSEPARATORS)
 
     # -------------------------------------------------------------------------
     def render_tree(self, widget_id, record=None):
         """
             Render the tree
 
-            @param widget_id: the widget ID
-            @param record: the root record (if requested)
+            Args:
+                widget_id: the widget ID
+                record: the root record (if requested)
         """
 
         resource = self.resource
@@ -270,7 +271,7 @@ class S3HierarchyCRUD(S3Method):
         # Apply the widget JS
         script = '''$('#%(widget_id)s').hierarchicalcrud(%(widget_opts)s)''' % \
                  {"widget_id": widget_id,
-                  "widget_opts": json.dumps(widget_opts, separators=SEPARATORS),
+                  "widget_opts": json.dumps(widget_opts, separators=JSONSEPARATORS),
                   }
         s3.jquery_ready.append(script)
 
@@ -371,7 +372,7 @@ class S3HierarchyCRUD(S3Method):
         all_nodes = h.findall(roots, inclusive=True)
 
         # ...and extract their data from a clone of the resource
-        from ..filters import FS
+        from ..resource import FS
         query = FS(h.pkey.name).belongs(all_nodes)
         clone = current.s3db.resource(resource, filter=query)
         data = clone.select(selectors, represent=True, raw_data=True)
@@ -411,7 +412,7 @@ class S3HierarchyCRUD(S3Method):
             output.extend(rows)
 
         # Encode in XLS format
-        from ..io import S3Codec
+        from ..resource import S3Codec
         codec = S3Codec.get_codec("xls")
         result = codec.encode(output,
                               title = resource.name,

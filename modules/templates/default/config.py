@@ -485,8 +485,6 @@ def config(settings):
     # 5: Apply Controller, Function & Table ACLs
     # 6: Apply Controller, Function, Table ACLs and Entity Realm
     # 7: Apply Controller, Function, Table ACLs and Entity Realm + Hierarchy
-    # 8: Apply Controller, Function, Table ACLs, Entity Realm + Hierarchy and Delegations
-
     settings.security.policy = 5 # Controller, Function & Table ACLs
 
     # Ownership-rule for records without owner:
@@ -1216,8 +1214,6 @@ def config(settings):
     #settings.project.activity_filter_year = True
     # Uncomment this to not use Beneficiaries for Activities
     #settings.project.get_project_activity_beneficiaries = False
-    # Uncomment this to not use Item Catalog for Distributions
-    #settings.project.activity_items = False
     # Uncomment this to use Codes for projects
     #settings.project.codes = True
     # Uncomment this to call project locations 'Communities'

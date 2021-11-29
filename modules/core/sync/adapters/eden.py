@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
+"""
+    Synchronization: Peer Repository Adapter
 
-""" S3 Synchronization: Peer Repository Adapter
-
-    @copyright: 2011-2021 (c) Sahana Software Foundation
-    @license: MIT
+    copyright: 2011-2021 (c) Sahana Software Foundation
 
     Permission is hereby granted, free of charge, to any person
     obtaining a copy of this software and associated documentation
@@ -32,18 +30,14 @@ import json
 import sys
 import traceback
 
+from lxml import etree
 from urllib import request as urllib2
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote as urllib_quote
 
-try:
-    from lxml import etree
-except ImportError:
-    sys.stderr.write("ERROR: lxml module needed for XML handling\n")
-    raise
-
 from gluon import current
 
+from ...resource import SyncPolicy
 from ...tools import s3_encode_iso_datetime, JSONERRORS
 
 from ..base import S3SyncBaseAdapter, S3SyncDataArchive
@@ -59,7 +53,8 @@ class S3SyncAdapter(S3SyncBaseAdapter):
         """
             Register this site at the peer repository
 
-            @return: True to indicate success, otherwise False
+            Returns:
+                True to indicate success, otherwise False
         """
 
         repository = self.repository
@@ -152,7 +147,8 @@ class S3SyncAdapter(S3SyncBaseAdapter):
         """
             Login at the peer repository
 
-            @return: None if successful, otherwise the error
+            Returns:
+                None if successful, otherwise the error
         """
 
         # Sahana Eden uses HTTP Basic Auth, no explicit login required
@@ -164,12 +160,14 @@ class S3SyncAdapter(S3SyncBaseAdapter):
             Fetch updates from the peer repository and import them
             into the local database (active pull)
 
-            @param task: the synchronization task (sync_task Row)
-            @param onconflict: callback for automatic conflict resolution
+            Args:
+                task: the synchronization task (sync_task Row)
+                onconflict: callback for automatic conflict resolution
 
-            @return: tuple (error, mtime), with error=None if successful,
-                     else error=message, and mtime=modification timestamp
-                     of the youngest record sent
+            Returns:
+                tuple (error, mtime), with error=None if successful,
+                else error=message, and mtime=modification timestamp
+                of the youngest record sent
         """
 
         xml = current.xml
@@ -220,7 +218,7 @@ class S3SyncAdapter(S3SyncBaseAdapter):
             # Construct the URL
             url = "%s/sync/sync.xml?resource=%s&repository=%s" % \
                   (repository.url, resource_name, config.uuid)
-            if last_pull and task.update_policy not in ("THIS", "OTHER"):
+            if last_pull and task.update_policy not in (SyncPolicy.THIS, SyncPolicy.OTHER):
                 url += "&msince=%s" % s3_encode_iso_datetime(last_pull)
             if task.components is False: # Allow None to remain the old default of 'Include Components'
                 url += "&mcomponents=None"
@@ -295,17 +293,10 @@ class S3SyncAdapter(S3SyncBaseAdapter):
         # Process the response
         mtime = None
         if response:
-
-            # Get import strategy and update policy
-            strategy = task.strategy
-            update_policy = task.update_policy
-            conflict_policy = task.conflict_policy
-
-            success = True
             message = ""
             action = "import"
 
-            # Import the data
+            # Sync Policy
             if onconflict:
                 onconflict_callback = lambda item: onconflict(item,
                                                               repository,
@@ -313,17 +304,21 @@ class S3SyncAdapter(S3SyncBaseAdapter):
                                                               )
             else:
                 onconflict_callback = None
+            sync_policy = SyncPolicy(onupdate = task.update_policy,
+                                     onconflict = task.conflict_policy,
+                                     resolve = onconflict_callback,
+                                     last_sync = last_pull,
+                                     )
+
+            # Import the data
             count = 0
             try:
-                success = resource.import_xml(response,
-                                              ignore_errors = True,
-                                              strategy = strategy,
-                                              update_policy = update_policy,
-                                              conflict_policy = conflict_policy,
-                                              last_sync = last_pull,
-                                              onconflict = onconflict_callback,
-                                              )
-                count = resource.import_count
+                import_result = resource.import_xml(response,
+                                                    ignore_errors = True,
+                                                    strategy = task.strategy,
+                                                    sync_policy = sync_policy,
+                                                    )
+                count = import_result.count
 
             except IOError as e:
                 result = log.FATAL
@@ -341,13 +336,13 @@ class S3SyncAdapter(S3SyncBaseAdapter):
                           traceback.format_exc()
                 output = xml.json_message(False, 500, sys.exc_info()[1])
 
-            mtime = resource.mtime
+            mtime = import_result.mtime
 
             # Log all validation errors
-            if resource.error_tree is not None:
+            if import_result.error_tree is not None:
                 result = log.WARNING
-                message = "%s" % resource.error
-                for element in resource.error_tree.findall("resource"):
+                message = "%s" % import_result.error
+                for element in import_result.error_tree.findall("resource"):
                     for field in element.findall("data[@error]"):
                         error_msg = field.get("error", None)
                         if error_msg:
@@ -360,10 +355,10 @@ class S3SyncAdapter(S3SyncBaseAdapter):
                             message = "%s, %s" % (message, msg)
 
             # Check for failure
-            if not success:
+            if not import_result.success:
                 result = log.FATAL
                 if not message:
-                    message = "%s" % resource.error
+                    message = "%s" % import_result.error
                 output = xml.json_message(False, 400, message)
                 mtime = None
 
@@ -404,11 +399,13 @@ class S3SyncAdapter(S3SyncBaseAdapter):
             Extract new updates from the local database and send
             them to the peer repository (active push)
 
-            @param task: the synchronization task (sync_task Row)
+            Args:
+                task: the synchronization task (sync_task Row)
 
-            @return: tuple (error, mtime), with error=None if successful,
-                     else error=message, and mtime=modification timestamp
-                     of the youngest record sent
+            Returns:
+                tuple (error, mtime), with error=None if successful,
+                else error=message, and mtime=modification timestamp
+                of the youngest record sent
         """
 
         xml = current.xml
@@ -433,7 +430,7 @@ class S3SyncAdapter(S3SyncBaseAdapter):
         if conflict_policy:
             url += "&conflict_policy=%s" % conflict_policy
         last_push = task.last_push
-        if last_push and update_policy not in ("THIS", "OTHER"):
+        if last_push and update_policy not in (SyncPolicy.THIS, SyncPolicy.OTHER):
             url += "&msince=%s" % s3_encode_iso_datetime(last_push)
         else:
             last_push = None
@@ -527,28 +524,31 @@ class S3SyncAdapter(S3SyncBaseAdapter):
     # -------------------------------------------------------------------------
     def send(self,
              resource,
-             start=None,
-             limit=None,
-             msince=None,
-             filters=None,
-             mixed=False,
-             pretty_print=False):
+             start = None,
+             limit = None,
+             msince = None,
+             filters = None,
+             mixed = False,
+             pretty_print = False,
+             ):
         """
             Respond to an incoming pull from the peer repository
 
-            @param resource: the resource to be synchronized
-            @param start: index of the first record to send
-            @param limit: maximum number of records to send
-            @param msince: minimum modification date/time for records to send
-            @param filters: URL filters for record extraction
-            @param mixed: negotiate resource with peer (disregard resource)
-            @param pretty_print: make the output human-readable
+            Args:
+                resource: the resource to be synchronized
+                start: index of the first record to send
+                limit: maximum number of records to send
+                msince: minimum modification date/time for records to send
+                filters: URL filters for record extraction
+                mixed: negotiate resource with peer (disregard resource)
+                pretty_print: make the output human-readable
 
-            @return: a dict {status, remote, message, response}, with:
-                        - status....the outcome of the operation
-                        - remote....whether the error was remote (or local)
-                        - message...the log message
-                        - response..the response to send to the peer
+            Returns:
+                a dict {status, remote, message, response}, with:
+                    - status....the outcome of the operation
+                    - remote....whether the error was remote (or local)
+                    - message...the log message
+                    - response..the response to send to the peer
         """
 
         if not resource or mixed:
@@ -586,29 +586,32 @@ class S3SyncAdapter(S3SyncBaseAdapter):
     def receive(self,
                 source,
                 resource,
-                strategy=None,
-                update_policy=None,
-                conflict_policy=None,
-                onconflict=None,
-                last_sync=None,
-                mixed=False):
+                strategy = None,
+                update_policy = None,
+                conflict_policy = None,
+                onconflict = None,
+                last_sync = None,
+                mixed = False,
+                ):
         """
             Respond to an incoming push from the peer repository
 
-            @param source: the input stream (list of file-like objects)
-            @param resource: the target resource
-            @param strategy: the import strategy
-            @param update_policy: the update policy
-            @param conflict_policy: the conflict resolution policy
-            @param onconflict: callback for conflict resolution
-            @param last_sync: the last synchronization date/time for the peer
-            @param mixed: negotiate resource with peer (disregard resource)
+            Args:
+                source: the input stream (list of file-like objects)
+                resource: the target resource
+                strategy: the import strategy
+                update_policy: the update policy
+                conflict_policy: the conflict resolution policy
+                onconflict: callback for conflict resolution
+                last_sync: the last synchronization date/time for the peer
+                mixed: negotiate resource with peer (disregard resource)
 
-            @return: a dict {status, remote, message, response}, with:
-                        - status....the outcome of the operation
-                        - remote....whether the error was remote (or local)
-                        - message...the log message
-                        - response..the response to send to the peer
+            Returns:
+                a dict {status, remote, message, response}, with:
+                    - status....the outcome of the operation
+                    - remote....whether the error was remote (or local)
+                    - message...the log message
+                    - response..the response to send to the peer
         """
 
         if not resource or mixed:
@@ -625,6 +628,7 @@ class S3SyncAdapter(S3SyncBaseAdapter):
         #        - have a repository setting to enforce strict validation?
         ignore_errors = True
 
+        # Sync Policy
         if onconflict:
             onconflict_callback = lambda item: onconflict(item,
                                                           repository,
@@ -632,28 +636,30 @@ class S3SyncAdapter(S3SyncBaseAdapter):
                                                           )
         else:
             onconflict_callback = None
+        sync_policy = SyncPolicy(onupdate = update_policy,
+                                 onconflict = conflict_policy,
+                                 resolve = onconflict_callback,
+                                 last_sync = last_sync,
+                                 )
 
-        output = resource.import_xml(source,
-                                     format = "xml",
-                                     ignore_errors = ignore_errors,
-                                     strategy = strategy,
-                                     update_policy = update_policy,
-                                     conflict_policy = conflict_policy,
-                                     last_sync = last_sync,
-                                     onconflict = onconflict_callback,
-                                     )
+        import_result = resource.import_xml(source,
+                                            source_type = "xml",
+                                            ignore_errors = ignore_errors,
+                                            strategy = strategy,
+                                            sync_policy = sync_policy,
+                                            )
 
         log = self.log
 
-        if resource.error_tree is not None:
+        if import_result.error_tree is not None:
             # Validation error (log in any case)
             if ignore_errors:
                 result = log.WARNING
             else:
                 result = log.FATAL
             remote = True
-            message = "%s" % resource.error
-            for element in resource.error_tree.findall("resource"):
+            message = "%s" % import_result.error
+            for element in import_result.error_tree.findall("resource"):
 
                 error_msg = element.get("error", "unknown error")
 
@@ -689,7 +695,7 @@ class S3SyncAdapter(S3SyncBaseAdapter):
         return {"status": result,
                 "remote": remote,
                 "message": message,
-                "response": output,
+                "response": import_result.json_message(),
                 }
 
     # -------------------------------------------------------------------------
@@ -698,9 +704,11 @@ class S3SyncAdapter(S3SyncBaseAdapter):
             Get the archive for a data set (fetch it from remote if
             necessary and available)
 
-            @param dataset_id: the data set ID
+            Args:
+                dataset_id: the data set ID
 
-            @return: S3SyncDataArchive for extraction
+            Returns:
+                S3SyncDataArchive for extraction
         """
 
         s3db = current.s3db
@@ -838,7 +846,8 @@ class S3SyncAdapter(S3SyncBaseAdapter):
         """
             Update the data set from the repo, if possible
 
-            @param dataset: the sync_dataset Row
+            Args:
+                dataset: the sync_dataset Row
         """
 
         s3 = current.response.s3
@@ -892,7 +901,8 @@ class S3SyncAdapter(S3SyncBaseAdapter):
         """
             Configure a HTTP opener for sync operations
 
-            @param url: the target URL
+            Args:
+                url: the target URL
         """
 
         repository = self.repository
@@ -941,8 +951,9 @@ class S3SyncAdapter(S3SyncBaseAdapter):
             # required (i.e. no 401 triggered), but we want to login in
             # any case:
             import base64
-            base64string = base64.encodestring('%s:%s' % (username, password))[:-1]
-            addheaders.append(("Authorization", "Basic %s" % base64string))
+            credentials = "%s:%s" % (username, password)
+            encoded = base64.b64encode(credentials.encode("utf-8"))
+            addheaders.append(("Authorization", "Basic %s" % encoded.decode("utf-8")))
 
         if addheaders:
             opener.addheaders = addheaders

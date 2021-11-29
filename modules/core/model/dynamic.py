@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
+"""
+    Dynamic Table Models
 
-""" S3 Data Model Extensions
-
-    @copyright: 2009-2021 (c) Sahana Software Foundation
-    @license: MIT
+    Copyright: 2009-2021 (c) Sahana Software Foundation
 
     Permission is hereby granted, free of charge, to any person
     obtaining a copy of this software and associated documentation
@@ -27,7 +25,7 @@
     OTHER DEALINGS IN THE SOFTWARE.
 """
 
-__all__ = ("S3DynamicModel",
+__all__ = ("DynamicTableModel",
            "DYNAMIC_PREFIX",
            "SERIALIZABLE_OPTS",
            )
@@ -59,16 +57,15 @@ SERIALIZABLE_OPTS = ("autosync",
 DEFAULT = lambda: None
 
 # =============================================================================
-class S3DynamicModel(object):
+class DynamicTableModel:
     """
         Class representing a dynamic table model
     """
 
     def __init__(self, tablename):
         """
-            Constructor
-
-            @param tablename: the table name
+            Args:
+                tablename: the table name
         """
 
         self.tablename = tablename
@@ -83,9 +80,11 @@ class S3DynamicModel(object):
         """
             Instantiate a dynamic Table
 
-            @param tablename: the table name
+            Args:
+                tablename: the table name
 
-            @return: a Table instance
+            Returns:
+                a Table instance
         """
 
         # Is the table already defined?
@@ -216,10 +215,12 @@ class S3DynamicModel(object):
         """
             Convert a s3_field Row into a Field instance
 
-            @param tablename: the table name
-            @param row: the s3_field Row
+            Args:
+                tablename: the table name
+                row: the s3_field Row
 
-            @return: a Field instance
+            Returns:
+                a Field instance
         """
 
         field = None
@@ -286,10 +287,12 @@ class S3DynamicModel(object):
         """
             Generic field constructor
 
-            @param tablename: the table name
-            @param row: the s3_field Row
+            Args:
+                tablename: the table name
+                row: the s3_field Row
 
-            @return: the Field instance
+            Returns:
+                the Field instance
         """
 
         fieldname = row.name
@@ -333,10 +336,12 @@ class S3DynamicModel(object):
         """
             Options-field constructor
 
-            @param tablename: the table name
-            @param row: the s3_field Row
+            Args:
+                tablename: the table name
+                row: the s3_field Row
 
-            @return: the Field instance
+            Returns:
+                the Field instance
         """
 
         fieldname = row.name
@@ -449,10 +454,12 @@ class S3DynamicModel(object):
         """
             Date field constructor
 
-            @param tablename: the table name
-            @param row: the s3_field Row
+            Args:
+                tablename: the table name
+                row: the s3_field Row
 
-            @return: the Field instance
+            Returns:
+                the Field instance
         """
 
         fieldname = row.name
@@ -490,10 +497,12 @@ class S3DynamicModel(object):
         """
             DateTime field constructor
 
-            @param tablename: the table name
-            @param row: the s3_field Row
+            Args:
+                tablename: the table name
+                row: the s3_field Row
 
-            @return: the Field instance
+            Returns:
+                the Field instance
         """
 
         fieldname = row.name
@@ -531,10 +540,12 @@ class S3DynamicModel(object):
         """
             Reference field constructor
 
-            @param tablename: the table name
-            @param row: the s3_field Row
+            Args:
+                tablename: the table name
+                row: the s3_field Row
 
-            @return: the Field instance
+            Returns:
+                the Field instance
         """
 
         fieldname = row.name
@@ -567,10 +578,12 @@ class S3DynamicModel(object):
         """
             Numeric field constructor
 
-            @param tablename: the table name
-            @param row: the s3_field Row
+            Args:
+                tablename: the table name
+                row: the s3_field Row
 
-            @return: the Field instance
+            Returns:
+                the Field instance
         """
 
         fieldname = row.name
@@ -615,10 +628,12 @@ class S3DynamicModel(object):
         """
             Boolean field constructor
 
-            @param tablename: the table name
-            @param row: the s3_field Row
+            Args:
+                tablename: the table name
+                row: the s3_field Row
 
-            @return: the Field instance
+            Returns:
+                the Field instance
         """
 
         fieldname = row.name
@@ -687,10 +702,12 @@ class S3DynamicModel(object):
         """
             Boolean field constructor
 
-            @param tablename: the table name
-            @param row: the s3_field Row
+            Args:
+                tablename: the table name
+                row: the s3_field Row
 
-            @return: the Field instance
+            Returns:
+                the Field instance
         """
 
         fieldname = row.name

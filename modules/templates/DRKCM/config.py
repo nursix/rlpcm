@@ -1,4 +1,8 @@
-# -*- coding: utf-8 -*-
+"""
+    DRKCM: Case Management, German Red Cross
+
+    License: MIT
+"""
 
 import datetime
 
@@ -15,9 +19,6 @@ from .uioptions import get_ui_options, get_ui_option
 
 # =============================================================================
 def config(settings):
-    """
-        DRKCM Template: Case Management, German Red Cross
-    """
 
     T = current.T
 
@@ -130,8 +131,6 @@ def config(settings):
     # 5: Apply Controller, Function & Table ACLs
     # 6: Apply Controller, Function, Table ACLs and Entity Realm
     # 7: Apply Controller, Function, Table ACLs and Entity Realm + Hierarchy
-    # 8: Apply Controller, Function, Table ACLs, Entity Realm + Hierarchy and Delegations
-    #
     settings.security.policy = 7 # Hierarchical Realms
 
     # Version details on About-page require login
@@ -297,6 +296,28 @@ def config(settings):
                     realm_entity = s3db.pr_get_pe_id("org_organisation",
                                                     user_org_id,
                                                     )
+
+        elif tablename == "doc_document":
+
+            # Inherit the realm entity from case or case activity if
+            # linked to one (otherwise default)
+            table = s3db.doc_document
+            ctable = s3db.dvr_case
+            atable = s3db.dvr_case_activity
+            left = [ctable.on(ctable.doc_id == table.doc_id),
+                    atable.on(atable.doc_id == table.doc_id),
+                    ]
+            ref = db(table.id == row.id).select(ctable.realm_entity,
+                                                atable.realm_entity,
+                                                left = left,
+                                                limitby = (0, 1),
+                                                ).first()
+            if ref:
+                realm_entity = ref.dvr_case.realm_entity or \
+                               ref.dvr_case_activity.realm_entity
+                if not realm_entity:
+                    realm_entity = 0
+
         return realm_entity
 
     settings.auth.realm_entity = drk_realm_entity
@@ -419,7 +440,7 @@ def config(settings):
             return
 
         db = current.db
-        s3db = current.s3db
+        #s3db = current.s3db
 
         table = db.doc_document
         row = db(table.id == record_id).select(table.id,
@@ -495,7 +516,7 @@ def config(settings):
             attr["rheader"] = drk_dvr_rheader
 
             # Set contacts-method to retain the tab
-            s3db.set_method("pr", "person",
+            s3db.set_method("pr_person",
                             method = "contacts",
                             action = s3db.pr_Contacts,
                             )
@@ -706,7 +727,7 @@ def config(settings):
             # Configure anonymize-method
             # TODO make standard via setting
             from core import S3Anonymize
-            s3db.set_method("pr", "person",
+            s3db.set_method("pr_person",
                             method = "anonymize",
                             action = S3Anonymize,
                             )
@@ -719,11 +740,11 @@ def config(settings):
 
             if current.auth.s3_has_role("CASE_MANAGEMENT"):
                 # Allow use of Document Templates
-                s3db.set_method("pr", "person",
+                s3db.set_method("pr_person",
                                 method = "templates",
                                 action = s3db.pr_Templates(),
                                 )
-                s3db.set_method("pr", "person",
+                s3db.set_method("pr_person",
                                 method = "template",
                                 action = s3db.pr_Template(),
                                 )
@@ -806,7 +827,7 @@ def config(settings):
                 configure = resource.configure
 
                 # Set contacts-method for tab
-                s3db.set_method("pr", "person",
+                s3db.set_method("pr_person",
                                 method = "contacts",
                                 action = s3db.pr_Contacts,
                                 )
@@ -824,7 +845,7 @@ def config(settings):
                 else:
                     # Add-Person-Widget (family members)
                     search_fields = ("first_name", "last_name")
-                s3db.set_method("pr", "person",
+                s3db.set_method("pr_person",
                                method = "search_ac",
                                action = s3db.pr_PersonSearchAutocomplete(search_fields),
                                )
@@ -1439,7 +1460,7 @@ def config(settings):
             if r.controller == "dvr":
 
                 # Set contacts-method to retain the tab
-                s3db.set_method("pr", "person",
+                s3db.set_method("pr_person",
                                 method = "contacts",
                                 action = s3db.pr_Contacts,
                                 )
@@ -2651,9 +2672,11 @@ def config(settings):
         """
             Get the root organisation managing a case
 
-            @param person_id: the person record ID
+            Args:
+                person_id: the person record ID
 
-            @returns: the root organisation record ID
+            Returns:
+                the root organisation record ID
         """
 
         db = current.db
@@ -2681,44 +2704,46 @@ def config(settings):
     def configure_response_theme_selector(ui_options,
                                           case_root_org = None,
                                           person_id = None,
+                                          record_id = None,
                                           case_activity = None,
                                           case_activity_id = None,
                                           ):
         """
             Configure response theme selector
 
-            @param ui_options: the UI options for the current org
-            @param case_root_org: the case root organisation
-            @param person_id: the person record ID (to look up the root org)
-            @param case_activity: the case activity record
-            @param case_activity_id: the case activity record ID
-                                     (to look up the case activity record)
+            Args:
+                ui_options: the UI options for the current org
+                case_root_org: the case root organisation
+                person_id: the person record ID (to look up the root org)
+                record_id: the response action record ID (if updating)
+                case_activity: the case activity record
+                case_activity_id: the case activity record ID
+                                  (to look up the case activity record)
         """
 
         db = current.db
         s3db = current.s3db
 
         ttable = s3db.dvr_response_theme
-        query = None
-
+        query = (ttable.obsolete == False) | (ttable.obsolete == None)
         # Limit themes to the themes of the case root organisation
         if not case_root_org:
             case_root_org = get_case_root_org(person_id)
             if not case_root_org:
                 case_root_org = current.auth.root_org()
         if case_root_org:
-            query = (ttable.organisation_id == case_root_org)
+            query = (ttable.organisation_id == case_root_org) & query
 
         themes_needs = settings.get_dvr_response_themes_needs()
         if ui_options.get("activity_use_need") and themes_needs:
-
             # Limit themes to those matching the need of the activity
             if case_activity:
                 need_id = case_activity.need_id
             elif case_activity_id:
                 # Look up the parent record
                 catable = s3db.dvr_case_activity
-                case_activity = db(catable.id == case_activity_id).select(catable.need_id,
+                case_activity = db(catable.id == case_activity_id).select(catable.id,
+                                                                          catable.need_id,
                                                                           limitby = (0, 1),
                                                                           ).first()
                 need_id = case_activity.need_id if case_activity else None
@@ -2726,13 +2751,35 @@ def config(settings):
                 need_id = None
             if need_id:
                 q = (ttable.need_id == need_id)
-                query = query & q if query else q
+                query = q & query if query else q
+
+        table = s3db.dvr_response_action
+        if record_id:
+            # Include currently selected themes even if they do not match
+            # any of the previous criteria
+            q = (table.id == record_id)
+            row = db(q).select(table.response_theme_ids,
+                               limitby = (0, 1),
+                               ).first()
+            if row and row.response_theme_ids:
+                query |= ttable.id.belongs(row.response_theme_ids)
+
+        elif case_activity:
+            # Include all themes currently linked to this case activity
+            # (for inline responses)
+            q = (table.case_activity_id == case_activity.id) & \
+                (table.deleted == False)
+            rows = db(q).select(table.response_theme_ids)
+            theme_ids = set()
+            for row in rows:
+                if row.response_theme_ids:
+                    theme_ids |= set(row.response_theme_ids)
+            if theme_ids:
+                query |= ttable.id.belongs(theme_ids)
 
         dbset = db(query) if query else db
 
-        table = s3db.dvr_response_action
         field = table.response_theme_ids
-
         if themes_needs:
             # Include the need in the themes-selector
             # - helps to find themes using the selector search field
@@ -2946,16 +2993,23 @@ def config(settings):
             date_due = "date_due" if use_due_date else None
 
             # Configure theme selector
+            record = r.record
             if r.tablename == "dvr_response_action":
                 is_master = True
-                person_id = r.record.person_id if r.record else None
+                if record:
+                    person_id = record.person_id
+                    record_id = record.id
+                else:
+                    person_id = record_id = None
             elif r.tablename == "pr_person" and \
                  r.component and r.component.tablename == "dvr_response_action":
                 is_master = False
-                person_id = r.record.id if r.record else None
+                person_id = record.id if record else None
+                record_id = r.component_id
 
             configure_response_theme_selector(ui_options,
                                               person_id = person_id,
+                                              record_id = record_id,
                                               )
 
             get_vars = r.get_vars
@@ -2990,6 +3044,7 @@ def config(settings):
                         field.label = T("Subject")
                         show_as = "subject"
 
+
                     represent = s3db.dvr_CaseActivityRepresent(show_as=show_as,
                                                                show_link=True,
                                                                )
@@ -2998,12 +3053,18 @@ def config(settings):
                     # Make activity selectable if not auto-linking, and
                     # filter options to case
                     if not ui_options_get("response_activity_autolink"):
+                        db = current.db
+                        represent = s3db.dvr_CaseActivityRepresent(show_as=show_as,
+                                                                   show_link=True,
+                                                                   show_date=True,
+                                                                   )
                         field.writable = True
-                        field.requires = IS_ONE_OF(current.db,
-                                                   "dvr_case_activity.id",
+                        field.requires = IS_ONE_OF(db, "dvr_case_activity.id",
                                                    represent,
                                                    filterby = "person_id",
                                                    filter_opts = (person_id,),
+                                                   orderby = ~db.dvr_case_activity.start_date,
+                                                   sort = False,
                                                    )
                     else:
                         field.writable = False
@@ -3234,7 +3295,7 @@ def config(settings):
 
         if "viewing" in current.request.get_vars:
             # Set contacts-method to retain the tab
-            s3db.set_method("pr", "person",
+            s3db.set_method("pr_person",
                             method = "contacts",
                             action = s3db.pr_Contacts,
                             )
@@ -3253,7 +3314,7 @@ def config(settings):
             if not r.id:
                 from .stats import PerformanceIndicatorExport
                 pitype = get_ui_options().get("response_performance_indicators")
-                s3db.set_method("dvr", "response_action",
+                s3db.set_method("dvr_response_action",
                                 method = "indicators",
                                 action = PerformanceIndicatorExport(pitype),
                                 )

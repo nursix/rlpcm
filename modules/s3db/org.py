@@ -1,9 +1,7 @@
-﻿# -*- coding: utf-8 -*-
+﻿"""
+    Organisation Model
 
-""" Sahana Eden Organisation Model
-
-    @copyright: 2009-2021 (c) Sahana Software Foundation
-    @license: MIT
+    Copyright: 2009-2021 (c) Sahana Software Foundation
 
     Permission is hereby granted, free of charge, to any person
     obtaining a copy of this software and associated documentation
@@ -98,7 +96,7 @@ from s3layouts import S3PopupLink
 SEPARATORS = (",", ":")
 
 # =============================================================================
-class OrgOrganisationModel(S3Model):
+class OrgOrganisationModel(DataModel):
     """
         Organisations
     """
@@ -662,7 +660,7 @@ class OrgOrganisationModel(S3Model):
                   )
 
         # Custom Method for S3OrganisationAutocompleteWidget
-        self.set_method("org", "organisation",
+        self.set_method("org_organisation",
                         method = "search_ac",
                         action = self.org_search_ac)
 
@@ -1006,10 +1004,12 @@ class OrgOrganisationModel(S3Model):
     def org_search_ac(r, **attr):
         """
             JSON search method for S3OrganisationAutocompleteWidget
-            - searches name & acronym for both this organisation & the parent
-              of branches
-            @param r: the S3Request
-            @param attr: request attributes
+                - searches name & acronym for both this organisation & the parent
+                  of branches
+
+            Args:
+                r: the CRUDRequest
+                attr: request attributes
         """
 
         _vars = current.request.get_vars
@@ -1130,7 +1130,7 @@ class OrgOrganisationModel(S3Model):
         return json.dumps(output, separators=SEPARATORS)
 
 # =============================================================================
-class OrgOrganisationNameModel(S3Model):
+class OrgOrganisationNameModel(DataModel):
     """
         Organsiation Names model
         - local names/acronyms for Organisations
@@ -1169,10 +1169,10 @@ class OrgOrganisationNameModel(S3Model):
                        )
 
         # Pass names back to global scope (s3.*)
-        return {}
+        return None
 
 # =============================================================================
-class OrgOrganisationBranchModel(S3Model):
+class OrgOrganisationBranchModel(DataModel):
     """
         Organisation Branches
     """
@@ -1377,7 +1377,7 @@ class OrgOrganisationBranchModel(S3Model):
             org_update_affiliations("org_organisation_branch", record)
 
 # =============================================================================
-class OrgOrganisationCapacityModel(S3Model):
+class OrgOrganisationCapacityModel(DataModel):
     """
         (Branch) Organisational Capacity Assessment
         - Flexible Questions (Dynamic Data Model)
@@ -1467,16 +1467,16 @@ class OrgOrganisationCapacityModel(S3Model):
                      )
 
         # Custom Report Method
-        self.set_method("org", "capacity_assessment_data",
+        self.set_method("org_capacity_assessment_data",
                         method = "custom_report",
                         action = org_CapacityReport())
 
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
-        return {}
+        return None
 
 # =============================================================================
-class OrgOrganisationGroupModel(S3Model):
+class OrgOrganisationGroupModel(DataModel):
     """
         Organisation Group Model
         - 'Coalitions' or 'Networks'
@@ -1615,7 +1615,7 @@ class OrgOrganisationGroupModel(S3Model):
                             )
 
         # Custom Method to Assign Orgs
-        self.set_method("org", "group",
+        self.set_method("org_group",
                         method = "assign",
                         action = org_AssignMethod(component="membership"))
 
@@ -1728,7 +1728,7 @@ class OrgOrganisationGroupModel(S3Model):
             org_update_affiliations("org_group_membership", record)
 
 # =============================================================================
-class OrgOrganisationGroupPersonModel(S3Model):
+class OrgOrganisationGroupPersonModel(DataModel):
     """
         Link table between Organisation Groups & Persons
     """
@@ -1809,10 +1809,10 @@ class OrgOrganisationGroupPersonModel(S3Model):
 
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
-        return {}
+        return None
 
 # =============================================================================
-class OrgOrganisationGroupTeamModel(S3Model):
+class OrgOrganisationGroupTeamModel(DataModel):
     """
         Link table between Organisation Groups & Teams
     """
@@ -1846,7 +1846,7 @@ class OrgOrganisationGroupTeamModel(S3Model):
                        )
 
         # Pass names back to global scope (s3.*)
-        return {}
+        return None
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -1882,7 +1882,7 @@ class OrgOrganisationGroupTeamModel(S3Model):
                                             )
 
 # =============================================================================
-class OrgOrganisationLocationModel(S3Model):
+class OrgOrganisationLocationModel(DataModel):
     """
         Organisation Location Model
         - Locations served by an Organisation
@@ -1930,10 +1930,10 @@ class OrgOrganisationLocationModel(S3Model):
                        )
 
         # Pass names back to global scope (s3.*)
-        return {}
+        return None
 
 # =============================================================================
-class OrgOrganisationOrganisationModel(S3Model):
+class OrgOrganisationOrganisationModel(DataModel):
     """
         Link table between Organisations & Organisations
         - can be used to provide non-hierarchical relationships
@@ -1978,7 +1978,7 @@ class OrgOrganisationOrganisationModel(S3Model):
                        )
 
         # Pass names back to global scope (s3.*)
-        return {}
+        return None
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -2004,7 +2004,7 @@ class OrgOrganisationOrganisationModel(S3Model):
             return None
 
 # =============================================================================
-class OrgOrganisationResourceModel(S3Model):
+class OrgOrganisationResourceModel(DataModel):
     """
         Organisation Resource Model
         - depends on Stats module
@@ -2019,7 +2019,7 @@ class OrgOrganisationResourceModel(S3Model):
         #settings = current.deployment_settings
         if not current.deployment_settings.has_module("stats"):
             current.log.warning("Organisation Resource Model needs Stats module enabling")
-            return {}
+            return None
 
         T = current.T
         #auth = current.auth
@@ -2161,10 +2161,10 @@ class OrgOrganisationResourceModel(S3Model):
                   )
 
         # Pass names back to global scope (s3.*)
-        return {}
+        return None
 
 # =============================================================================
-class OrgOrganisationSectorModel(S3Model):
+class OrgOrganisationSectorModel(DataModel):
     """
         Organisation Sector Model
     """
@@ -2489,7 +2489,7 @@ class OrgOrganisationSectorModel(S3Model):
     #        return current.messages.UNKNOWN_OPT
 
 # =============================================================================
-class OrgServiceModel(S3Model):
+class OrgServiceModel(DataModel):
     """
         Organisation Service Model
     """
@@ -2735,7 +2735,7 @@ class OrgServiceModel(S3Model):
                      Field("status",
                            default = "ACTIVE",
                            label = T("Status"),
-                           represent = S3Represent(options=dict(service_status_opts)),
+                           represent = represent_option(dict(service_status_opts)),
                            requires = IS_IN_SET(service_status_opts,
                                                 sort = False,
                                                 zero = None,
@@ -3062,7 +3062,7 @@ def org_service_root_service(service_id):
     return new_root
 
 # =============================================================================
-class OrgOrganisationTagModel(S3Model):
+class OrgOrganisationTagModel(DataModel):
     """
         Organisation Tags
     """
@@ -3104,10 +3104,10 @@ class OrgOrganisationTagModel(S3Model):
                        )
 
         # Pass names back to global scope (s3.*)
-        return {}
+        return None
 
 # =============================================================================
-class OrgOrganisationTeamModel(S3Model):
+class OrgOrganisationTeamModel(DataModel):
     """
         Link table between Organisations & Teams
     """
@@ -3139,7 +3139,7 @@ class OrgOrganisationTeamModel(S3Model):
                        )
 
         # Pass names back to global scope (s3.*)
-        return {}
+        return None
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -3170,7 +3170,7 @@ class OrgOrganisationTeamModel(S3Model):
         org_update_affiliations("org_organisation_team", row.id)
 
 # =============================================================================
-class OrgOrganisationTypeTagModel(S3Model):
+class OrgOrganisationTypeTagModel(DataModel):
     """
         Organisation Type Tags
     """
@@ -3209,10 +3209,10 @@ class OrgOrganisationTypeTagModel(S3Model):
                        )
 
         # Pass names back to global scope (s3.*)
-        return {}
+        return None
 
 # =============================================================================
-class OrgSiteModel(S3Model):
+class OrgSiteModel(DataModel):
     """
         Site Super-Entity
     """
@@ -3303,19 +3303,19 @@ class OrgSiteModel(S3Model):
                                           )
 
         # Custom Method for S3SiteAutocompleteWidget
-        set_method("org", "site",
+        set_method("org_site",
                    method = "search_ac",
                    action = self.site_search_ac)
 
         # Custom Method for S3AddPersonWidget
         # @ToDo: One for HRMs
-        set_method("org", "site",
+        set_method("org_site",
                    method = "site_contact_person",
                    action = self.site_contact_person)
 
         # Custom Method to Assign HRs
         # - done in instances
-        #set_method("org", "site",
+        #set_method("org_site",
         #           method = "assign",
         #           action = self.hrm_AssignMethod(component="human_resource_site"))
 
@@ -3450,17 +3450,19 @@ class OrgSiteModel(S3Model):
             from variations of its name (rewritten for better
             comprehensibility; unused, retained for reference)
 
-            @param name: the site name
-            @param site_id: the site ID
+            Args:
+                name: the site name
+                site_id: the site ID
 
-            @returns: the unique code, or None if no unique code could
-                      be found
+            Returns:
+                the unique code, or None if no unique code could be found
 
-            @note: this function shows extremely poor performance when
-                   there are hundreds or thousands of sites where the
-                   names start with the same 10 characters (e.g. when
-                   the names start with the site type, as is often the
-                   case)
+            Note:
+                This function shows extremely poor performance when
+                there are hundreds or thousands of sites where the
+                names start with the same 10 characters (e.g. when
+                the names start with the site type, as is often the
+                case)
         """
 
         # ASCII alphanumeric characters, with letters in least
@@ -3540,10 +3542,12 @@ class OrgSiteModel(S3Model):
         """
             Generate a unique site code (replaces get_unique_code)
 
-            @param name: the site name
-            @param site_id: the site_id
+            Args:
+                name: the site name
+                site_id: the site_id
 
-            @returns: site code
+            Returns:
+                site code
         """
 
         import random
@@ -3699,8 +3703,9 @@ class OrgSiteModel(S3Model):
         """
             JSON search method for S3SiteAutocompleteWidget
 
-            @param r: the S3Request
-            @param attr: request attributes
+            Args:
+                r: the CRUDRequest
+                attr: request attributes
         """
 
         response = current.response
@@ -3796,7 +3801,7 @@ class OrgSiteModel(S3Model):
         return json.dumps(output, separators=SEPARATORS)
 
 # =============================================================================
-class OrgSiteDetailsModel(S3Model):
+class OrgSiteDetailsModel(DataModel):
     """ Extra optional details for Sites """
 
     names = ("org_site_status",
@@ -3837,7 +3842,7 @@ class OrgSiteDetailsModel(S3Model):
                                 requires = IS_EMPTY_OR(
                                             IS_IN_SET(site_status_opts)),
                                 label = T("Facility Status"),
-                                represent = S3Represent(options = site_status_opts),
+                                represent = represent_option(site_status_opts),
                                 ),
                           s3_date("date_reopening",
                                   label = T("Estimated Reopening Date"),
@@ -3849,7 +3854,7 @@ class OrgSiteDetailsModel(S3Model):
                                 requires = IS_EMPTY_OR(
                                             IS_IN_SET(power_supply_type_opts,
                                                       zero=None)),
-                                represent = S3Represent(options = power_supply_type_opts),
+                                represent = represent_option(power_supply_type_opts),
                                 ),
                           s3_date("last_contacted",
                                   label = T("Last Contacted"),
@@ -3904,7 +3909,7 @@ class OrgSiteDetailsModel(S3Model):
                 }
 
 # =============================================================================
-class OrgSiteEventModel(S3Model):
+class OrgSiteEventModel(DataModel):
     """
         Events for Sites
         - Check-In/Check-Out
@@ -3942,12 +3947,12 @@ class OrgSiteEventModel(S3Model):
                           Field("event", "integer",
                                 label = T("Event"),
                                 requires = IS_IN_SET(event_opts),
-                                represent = S3Represent(options = event_opts),
+                                represent = represent_option(event_opts),
                                 ),
                           Field("status", "integer",
                                 label = T("Status"),
                                 requires = IS_EMPTY_OR(IS_IN_SET(site_status_opts)),
-                                represent = S3Represent(options = site_status_opts),
+                                represent = represent_option(site_status_opts),
                                 ),
                           self.pr_person_id(ondelete = "SET NULL"),
                           s3_comments(),
@@ -3966,10 +3971,10 @@ class OrgSiteEventModel(S3Model):
                        )
 
         # Pass names back to global scope (s3.*)
-        return {}
+        return None
 
 # =============================================================================
-class OrgSiteGroupModel(S3Model):
+class OrgSiteGroupModel(DataModel):
     """ Link Sites to Org Groups """
 
     names = ("org_site_org_group",
@@ -3990,10 +3995,10 @@ class OrgSiteGroupModel(S3Model):
                           *s3_meta_fields())
 
         # Pass names back to global scope (s3.*)
-        return {}
+        return None
 
 # =============================================================================
-class OrgSiteNameModel(S3Model):
+class OrgSiteNameModel(DataModel):
     """
         Site Names model
         - local names/acronyms for Sites/Facilities
@@ -4028,10 +4033,10 @@ class OrgSiteNameModel(S3Model):
                        )
 
         # Pass names back to global scope (s3.*)
-        return {}
+        return None
 
 # =============================================================================
-class OrgSiteShiftModel(S3Model):
+class OrgSiteShiftModel(DataModel):
     """
         Site Shifts model
     """
@@ -4070,10 +4075,10 @@ class OrgSiteShiftModel(S3Model):
         #    )
 
         # Pass names back to global scope (s3.*)
-        return {}
+        return None
 
 # =============================================================================
-class OrgSiteTagModel(S3Model):
+class OrgSiteTagModel(DataModel):
     """
         Site Tags
     """
@@ -4118,10 +4123,10 @@ class OrgSiteTagModel(S3Model):
                        )
 
         # Pass names back to global scope (s3.*)
-        return {}
+        return None
 
 # =============================================================================
-class OrgSiteLocationModel(S3Model):
+class OrgSiteLocationModel(DataModel):
     """
         Site Location Model
         - Locations served by a Site/Facility
@@ -4183,10 +4188,10 @@ class OrgSiteLocationModel(S3Model):
                        )
 
         # Pass names back to global scope (s3.*)
-        return {}
+        return None
 
 # =============================================================================
-class OrgFacilityModel(S3Model):
+class OrgFacilityModel(DataModel):
     """
         Generic Site
     """
@@ -4614,7 +4619,7 @@ class OrgFacilityModel(S3Model):
                   )
 
         # Custom Method to Assign HRs
-        self.set_method("org", "facility",
+        self.set_method("org_facility",
                         method = "assign",
                         action = self.hrm_AssignMethod(component="human_resource_site"))
 
@@ -4852,7 +4857,7 @@ def org_facility_rheader(r, tabs=None):
     return rheader
 
 # =============================================================================
-class OrgRoomModel(S3Model):
+class OrgRoomModel(DataModel):
     """
         Rooms are a location within a Site
         - used by Asset module
@@ -4935,7 +4940,7 @@ class OrgRoomModel(S3Model):
                 }
 
 # =============================================================================
-class OrgOfficeModel(S3Model):
+class OrgOfficeModel(DataModel):
 
     names = ("org_office",
              "org_office_type",
@@ -5267,7 +5272,7 @@ class OrgOfficeModel(S3Model):
         org_update_affiliations("org_office", form.vars)
 
 # =============================================================================
-class OrgOfficeTypeTagModel(S3Model):
+class OrgOfficeTypeTagModel(DataModel):
     """
         Office Type Tags
     """
@@ -5308,7 +5313,7 @@ class OrgOfficeTypeTagModel(S3Model):
                        )
 
         # Pass names back to global scope (s3.*)
-        return {}
+        return None
 
 # =============================================================================
 def org_organisation_address(row):
@@ -5387,9 +5392,12 @@ def org_parents(organisation_id, path=None):
     """
         Lookup the parent organisations of a branch organisation
 
-        @param organisation_id: the organisation's record ID
+        Args:
+            organisation_id: the organisation's record ID
 
-        @return: list of ids of the parent organisations, starting with the immediate parent
+        Returns:
+            list of ids of the parent organisations, starting with the
+            immediate parent
     """
 
     if not organisation_id:
@@ -5426,10 +5434,12 @@ def org_root_organisation(organisation_id):
     """
         Lookup the root organisation of a branch organisation
 
-        @param organisation_id: the organisation's record ID
+        Args:
+            organisation_id: the organisation's record ID
 
-        @return: id of the root organisation,
-                 or None if no root organisation can be found
+        Returns:
+            id of the root organisation,
+            or None if no root organisation can be found
     """
 
     if not organisation_id:
@@ -5462,10 +5472,12 @@ def org_root_organisation_name(organisation_id):
     """
         Lookup the root organisation name of a branch organisation
 
-        @param organisation_id: the organisation's record ID
+        Args:
+            organisation_id: the organisation's record ID
 
-        @return: name of the root organisation,
-                 or None if no root organisation can be found
+        Returns:
+            name of the root organisation,
+            or None if no root organisation can be found
     """
 
     if not organisation_id:
@@ -5501,13 +5513,15 @@ def org_organisation_requires(required = False,
                               updateable = False
                               ):
     """
-        @param required: Whether the selection is optional or mandatory
-        @param realms: Whether the list should be filtered to just those
-                       belonging to a list of realm entities
-        @param updateable: Whether the list should be filtered to just those
-                           which the user has Write access to
-        @ToDo: Option to remove Branches
-        @ToDo: Option to only include Branches
+        Args:
+            required: Whether the selection is optional or mandatory
+            realms: Whether the list should be filtered to just those
+                    belonging to a list of realm entities
+            updateable: Whether the list should be filtered to just those
+                        which the user has Write access to
+
+        TODO Option to remove Branches
+        TODO Option to only include Branches
     """
 
     requires = IS_ONE_OF(current.db, "org_organisation.id",
@@ -5525,8 +5539,11 @@ def org_region_options(zones=False):
     """
         Get all options for region IDs
 
-        @param zones: select only zones if True, otherwise only regions
-        @return: dict of {org_region.id: representation}
+        Args:
+            zones: select only zones if True, otherwise only regions
+
+        Returns:
+            dict of {org_region.id: representation}
     """
 
     represent = current.s3db.org_region_represent
@@ -5602,7 +5619,8 @@ class org_OrganisationRepresent(S3Represent):
             key and fields are not used, but are kept for API
             compatibility reasons.
 
-            @param values: the organisation IDs
+            Args:
+                values: the organisation IDs
         """
 
         s3db = current.s3db
@@ -5663,7 +5681,8 @@ class org_OrganisationRepresent(S3Represent):
         """
             Represent a single Row
 
-            @param row: the org_organisation Row
+            Args:
+                row: the org_organisation Row
         """
 
         show_parent = self.parent
@@ -5770,12 +5789,14 @@ class org_SiteRepresent(S3Represent):
         """
             Represent multiple values as dict {value: representation}
 
-            @param values: list of values
-            @param rows: the referenced rows (if values are foreign keys)
-            @param show_link: render each representation as link
-            @param include_blank: Also include a blank value
+            Args:
+                values: list of values
+                rows: the referenced rows (if values are foreign keys)
+                show_link: render each representation as link
+                include_blank: Also include a blank value
 
-            @return: a dict {value: representation}
+            Returns:
+                a dict {value: representation}
         """
 
         show_link = show_link and self.show_link
@@ -5815,7 +5836,8 @@ class org_SiteRepresent(S3Represent):
             Parameters key and fields are not used, but are kept for API
             compatibility reasons.
 
-            @param values: the site IDs
+            Args:
+                values: the site IDs
         """
 
         db = current.db
@@ -5929,9 +5951,10 @@ class org_SiteRepresent(S3Represent):
         """
             Represent a (key, value) as hypertext link.
 
-            @param k: the key (site_id)
-            @param v: the representation of the key
-            @param row: the row with this key
+            Args:
+                k: the key (site_id)
+                v: the representation of the key
+                row: the row with this key
         """
 
         if row:
@@ -5955,7 +5978,8 @@ class org_SiteRepresent(S3Represent):
         """
             Represent a single Row
 
-            @param row: the org_site Row
+            Args:
+                row: the org_site Row
         """
 
         if self.translate:
@@ -5986,18 +6010,20 @@ class org_SiteRepresent(S3Represent):
         return s3_str(name)
 
 # =============================================================================
-class org_SiteCheckInMethod(S3Method):
+class org_SiteCheckInMethod(CRUDMethod):
     """
         Custom Method to allow a trackable resource to check-in/out to a Site
         e.g. using a Barcode scanner (for the person's pe_label)
     """
 
+    # -------------------------------------------------------------------------
     def apply_method(self, r, **attr):
         """
             Entry point for the REST API
 
-            @param r: the S3Request
-            @param attr: controller parameters
+            Args:
+                r: the CRUDRequest
+                attr: controller parameters
         """
 
         output = {}
@@ -6023,8 +6049,9 @@ class org_SiteCheckInMethod(S3Method):
         """
             Render the check-in page
 
-            @param r: the S3Request
-            @param attr: controller parameters
+            Args:
+                r: the CRUDRequest
+                attr: controller parameters
         """
 
         T = current.T
@@ -6064,6 +6091,7 @@ class org_SiteCheckInMethod(S3Method):
                             ),
                       Field("person",
                             label = "",
+                            readable = True,
                             writable = False,
                             default = "",
                             ),
@@ -6081,11 +6109,13 @@ class org_SiteCheckInMethod(S3Method):
 
         # Initial data
         data = {"id": "",
-                "label": pe_label,
+                "label": "", #pe_label,
                 "person": "",
                 "status": "",
                 "info": "",
                 }
+        if person:
+            data["label"] = pe_label
 
         # Hidden inputs
         hidden = {
@@ -6119,7 +6149,7 @@ class org_SiteCheckInMethod(S3Method):
         formstyle = settings.get_ui_formstyle()
         widget_id = "check-in-form"
         table_name = "site_check_in"
-        form = SQLFORM.factory(record = data if person else None,
+        form = SQLFORM.factory(record = data, # if person else None,
                                showid = False,
                                formstyle = formstyle,
                                table_name = table_name,
@@ -6153,11 +6183,13 @@ class org_SiteCheckInMethod(S3Method):
             Custom widget for label input, providing a clear-button
             (for ease of use on mobile devices where no ESC exists)
 
-            @param field: the Field
-            @param value: the current value
-            @param attributes: HTML attributes
+            Args:
+                field: the Field
+                value: the current value
+                attributes: HTML attributes
 
-            NB: expects Foundation theme
+            Note:
+                expects Foundation theme
         """
 
         from gluon.sqlhtml import StringWidget
@@ -6189,8 +6221,9 @@ class org_SiteCheckInMethod(S3Method):
                  l: the PE label
                  }
 
-            @param r: the S3Request
-            @param attr: controller parameters
+            Args:
+                r: the CRUDRequest
+                attr: controller parameters
         """
 
         T = current.T
@@ -6290,8 +6323,9 @@ class org_SiteCheckInMethod(S3Method):
             Convert person details and current check-in status into
             a JSON-serializable dict for Ajax-actions
 
-            @param person: the person record
-            @param status: the status dict (from status())
+            Args:
+                person: the person record
+                status: the status dict (from status())
         """
 
         person_details = cls.person_details(person)
@@ -6317,7 +6351,8 @@ class org_SiteCheckInMethod(S3Method):
         """
             Get the person record for the label
 
-            @param label: the PE label
+            Args:
+                label: the PE label
         """
 
         # Fields to extract
@@ -6348,11 +6383,13 @@ class org_SiteCheckInMethod(S3Method):
             invokes the check_in_status hook for the site resource
             to obtain current status information.
 
-            @param r: the S3Request
-            @param site_id: the site ID
-            @param person: the person record
+            Args:
+                r: the CRUDRequest
+                site_id: the site ID
+                person: the person record
 
-            @return: a dict like:
+            Returns:
+                a dict like:
                      {valid: True|False, whether the person record is valid
                              for check-in/out at this site
                       status: 1 = currently checked-in at this site
@@ -6395,7 +6432,8 @@ class org_SiteCheckInMethod(S3Method):
         """
             Format the person details
 
-            @param person: the person record (Row)
+            Args:
+                person: the person record (Row)
         """
 
         T = current.T
@@ -6416,10 +6454,12 @@ class org_SiteCheckInMethod(S3Method):
         """
             Get the profile picture URL for a person
 
-            @param person: the person record (Row)
+            Args:
+                person: the person record (Row)
 
-            @return: the profile picture URL (relative URL), or None if
-                     no profile picture is available for that person
+            Returns:
+                the profile picture URL (relative URL), or None if
+                no profile picture is available for that person
         """
 
         try:
@@ -6447,8 +6487,9 @@ class org_SiteCheckInMethod(S3Method):
             Check-in the person at this site, invokes the site_check_in
             hook for the site resource
 
-            @param r: the S3Request
-            @param person: the person record
+            Args:
+                r: the CRUDRequest
+                person: the person record
         """
 
         from core.tools import S3Trackable
@@ -6482,8 +6523,9 @@ class org_SiteCheckInMethod(S3Method):
             Check-out the person from this site, invokes the site_check_out
             hook for the site resource
 
-            @param r: the S3Request
-            @param person: the person record
+            Args:
+                r: the CRUDRequest
+                person: the person record
         """
 
         from core.tools import S3Trackable
@@ -6517,8 +6559,9 @@ class org_SiteCheckInMethod(S3Method):
             Helper function to inject static JS and instantiate the
             client-side widget
 
-            @param widget_id: the node ID where to instantiate the widget
-            @param options: dict of widget options (JSON-serializable)
+            Args:
+                widget_id: the node ID where to instantiate the widget
+                options: dict of widget options (JSON-serializable)
         """
 
         s3 = current.response.s3
@@ -7236,19 +7279,14 @@ def org_organisation_controller():
         return output
     s3.postp = postp
 
-    output = current.rest_controller("org", "organisation",
-                                     # Need to be explicit since can also come from HRM or Project controllers
-                                     csv_stylesheet = ("org", "organisation.xsl"),
-                                     csv_template = ("org", "organisation"),
-                                     # Don't allow components with components (such as document) to breakout from tabs
-                                     native = False,
-                                     rheader = org_rheader,
-                                     )
-    return output
-
-
-
-
+    return current.crud_controller("org", "organisation",
+                                   # Need to be explicit since can also come from HRM or Project controllers
+                                   csv_stylesheet = ("org", "organisation.xsl"),
+                                   csv_template = ("org", "organisation"),
+                                   # Don't allow components with components (such as document) to breakout from tabs
+                                   native = False,
+                                   rheader = org_rheader,
+                                   )
 
 # -----------------------------------------------------------------------------
 def org_organisation_organisation_onaccept(form):
@@ -7258,11 +7296,13 @@ def org_organisation_organisation_onaccept(form):
         ever take effect since the org_organisation record is written
         before the org_organisation_organisation)
 
-        NB Not Active by Default
-        - activate for templates that need this:
-            * RMS
+        Args:
+            form: the Form
 
-        @param form: the Form
+        Note:
+            Not Active by Default
+            - activate for templates that need this:
+                * RMS
     """
 
     # Get the link
@@ -7289,11 +7329,13 @@ def org_organisation_organisation_ondelete(row):
         organisation link (otherwise link-dependent realm rules won't
         take effect)
 
-        NB Not Active by Default
-        - activate for templates that need this:
-            * RMS
+        Args:
+            form: the Row
 
-        @param form: the Row
+        Note:
+            Not Active by Default
+            - activate for templates that need this:
+                * RMS
     """
 
     # Get the link
@@ -7327,11 +7369,13 @@ def org_organisation_organisation_type_onaccept(form):
         ever take effect since the org_organisation record is written
         before the org_organisation_organisation_type)
 
-        NB Not Active by Default
-        - activate for templates that need this:
-            * RMS
+        Args:
+            form: the Form
 
-        @param form: the Form
+        Note:
+            Not Active by Default
+            - activate for templates that need this:
+                * RMS
     """
 
     # Get the link
@@ -7358,11 +7402,13 @@ def org_organisation_organisation_type_ondelete(row):
         organisation type (otherwise type-dependent realm rules won't
         take effect)
 
-        NB Not Active by Default
-        - activate for templates that need this:
-            * RMS
+        Args:
+            form: the Row
 
-        @param form: the Row
+        Note:
+            Not Active by Default
+            - activate for templates that need this:
+                * RMS
     """
 
     # Get the link
@@ -7549,12 +7595,11 @@ def org_office_controller():
         return output
     s3.postp = postp
 
-    output = current.rest_controller("org", "office",
-                                     # Don't allow components with components (such as document) to breakout from tabs
-                                     native = False,
-                                     rheader = org_rheader,
-                                     )
-    return output
+    return current.crud_controller("org", "office",
+                                   # Don't allow components with components (such as document) to breakout from tabs
+                                   native = False,
+                                   rheader = org_rheader,
+                                   )
 
 # =============================================================================
 def org_facility_controller():
@@ -7812,10 +7857,7 @@ def org_facility_controller():
         return output
     s3.postp = postp
 
-    output = current.rest_controller("org", "facility",
-                                     rheader = org_rheader,
-                                     )
-    return output
+    return current.crud_controller("org", "facility", rheader=org_rheader)
 
 # =============================================================================
 # Hierarchy Manipulation
@@ -7824,8 +7866,9 @@ def org_update_affiliations(table, record):
     """
         Update OU affiliations related to this record
 
-        @param table: the table
-        @param record: the record
+        Args:
+            table: the table
+            record: the record
     """
 
     if hasattr(table, "_tablename"):
@@ -7896,7 +7939,8 @@ def organisation_update_affiliations(record):
     """
         Update affiliations for a branch organisation
 
-        @param record: the org_organisation_branch record
+        Args:
+            record: the org_organisation_branch record
     """
 
     if record.deleted and record.deleted_fk:
@@ -7964,7 +8008,8 @@ def org_group_update_affiliations(record):
     """
         Update affiliations for organisation group memberships
 
-        @param record: the org_group_membership record
+        Args:
+            record: the org_group_membership record
     """
 
     if record.deleted and record.deleted_fk:
@@ -8028,7 +8073,8 @@ def org_site_update_affiliations(record):
     """
         Update the affiliations of an org_site instance
 
-        @param record: the org_site instance record
+        Args:
+            record: the org_site instance record
     """
 
     from .pr import OU
@@ -8077,7 +8123,8 @@ def org_team_update_affiliations(record):
     """
         Update affiliations for an organisation team
 
-        @param record: the org_organisation_team record
+        Args:
+            record: the org_organisation_team record
     """
 
     # Get the group_id of the team
@@ -8149,11 +8196,13 @@ def org_update_root_organisation(organisation_id, root_org=None):
     """
         Update the root organisation of an org_organisation
 
-        @param organisation_id: the org_organisation record ID
-        @param root_org: the root organisation record ID (for
-                         internal use in update cascade only)
+        Args:
+            organisation_id: the org_organisation record ID
+            root_org: the root organisation record ID (for
+                      internal use in update cascade only)
 
-        @return: the root organisation ID
+        Returns:
+            the root organisation ID
     """
 
     # @todo: make immune against circular references!
@@ -8209,7 +8258,7 @@ def org_update_root_organisation(organisation_id, root_org=None):
     return root_org
 
 # =============================================================================
-class org_OrganisationDuplicate(object):
+class org_OrganisationDuplicate:
     """ Import item deduplication, match by name or l10_name """
 
     @classmethod
@@ -8217,7 +8266,8 @@ class org_OrganisationDuplicate(object):
         """
             Main method, to be set for the "deduplicate" hook
 
-            @param item: the S3ImportItem
+            Args:
+                item: the ImportItem
         """
 
         try:
@@ -8242,12 +8292,16 @@ class org_OrganisationDuplicate(object):
             Get the record ID that corresponds to the given import item
             or UUID
 
-            @param item: the import item
-            @param uid: the UUID
+            Args:
+                item: the import item
+                uid: the UUID
 
-            @return: the record ID if successfully identified, or
-                     None if there is no record for that item yet
-            @raise ValueError: if there are multiple matches in the DB
+            Returns:
+                the record ID if successfully identified, or
+                None if there is no record for that item yet
+
+            Raises:
+                ValueError: if there are multiple matches in the DB
         """
 
         if item.id:
@@ -8333,10 +8387,13 @@ class org_OrganisationDuplicate(object):
         """
             Find all name matches for the given import item
 
-            @param item: the import item
-            @return: a dict {id: name, parent: parent_id} of records which
-                     match the import item by name, or alternatively by
-                     local name if enabled and no direct name match
+            Args:
+                item: the import item
+
+            Returns:
+                a dict {id: name, parent: parent_id} of records which
+                match the import item by name, or alternatively by
+                local name if enabled and no direct name match
         """
 
         matches = {}
@@ -8385,8 +8442,11 @@ class org_OrganisationDuplicate(object):
         """
             Find the parent for the given import item
 
-            @param item: the import item
-            @return: a tuple (id, uid, item) for the parent
+            Args:
+                item: the import item
+
+            Returns:
+                a tuple (id, uid, item) for the parent
         """
 
         parent_id = parent_uid = parent_item = None
@@ -8417,7 +8477,7 @@ class org_OrganisationDuplicate(object):
         return parent_id, parent_uid, parent_item
 
 # =============================================================================
-class org_AssignMethod(S3Method):
+class org_AssignMethod(CRUDMethod):
     """
         Custom Method to allow organisations to be assigned to something
         e.g. Organisation Group
@@ -8425,17 +8485,22 @@ class org_AssignMethod(S3Method):
 
     def __init__(self, component):
         """
-            @param component: the Component in which to create records
+            Args:
+                component: the Component in which to create records
         """
+
+        super(org_AssignMethod, self).__init__()
 
         self.component = component
 
+    # -------------------------------------------------------------------------
     def apply_method(self, r, **attr):
         """
-            Apply method.
+            Applies the method (controller entry point).
 
-            @param r: the S3Request
-            @param attr: controller options for this request
+            Args:
+                r: the CRUDRequest
+                attr: controller options for this request
         """
 
         try:
@@ -8557,8 +8622,7 @@ class org_AssignMethod(S3Method):
                                    count=True,
                                    represent=True)
             filteredrows = data["numrows"]
-            dt = S3DataTable(data["rfields"], data["rows"])
-            dt_id = "datatable"
+            dt = DataTable(data["rfields"], data["rows"], "datatable")
 
             # Bulk actions
             dt_bulk_actions = [(T("Add"), "assign")]
@@ -8579,22 +8643,21 @@ class org_AssignMethod(S3Method):
                 # Data table (items)
                 items = dt.html(totalrows,
                                 filteredrows,
-                                dt_id,
                                 dt_ajax_url=URL(args = r.args,
                                                 extension="aadata",
                                                 vars={},
                                                 ),
                                 dt_bulk_actions=dt_bulk_actions,
                                 dt_pageLength=display_length,
-                                dt_pagination="true",
-                                dt_searching="false",
+                                dt_pagination=True,
+                                dt_searching=False,
                                 )
 
                 # Filter form
                 if filter_widgets:
 
                     # Where to retrieve filtered data from:
-                    _vars = resource.crud._remove_filters(r.get_vars)
+                    _vars = CRUDMethod._remove_filters(r.get_vars)
                     filter_submit_url = r.url(vars=_vars)
 
                     # Where to retrieve updated filter options from:
@@ -8641,7 +8704,6 @@ class org_AssignMethod(S3Method):
                     echo = None
                 items = dt.json(totalrows,
                                 filteredrows,
-                                dt_id,
                                 echo,
                                 dt_bulk_actions=dt_bulk_actions)
                 response.headers["Content-Type"] = "application/json"
@@ -8653,17 +8715,19 @@ class org_AssignMethod(S3Method):
             r.error(405, current.ERROR.BAD_METHOD)
 
 # =============================================================================
-class org_CapacityReport(S3Method):
+class org_CapacityReport(CRUDMethod):
     """
         Custom Report Method for Organisation Capacity Assessment Data
     """
 
+    # -------------------------------------------------------------------------
     def apply_method(self, r, **attr):
         """
-            Apply method.
+            Applies the method (controller entry point).
 
-            @param r: the S3Request
-            @param attr: controller options for this request
+            Args:
+                r: the CRUDRequest
+                attr: controller options for this request
         """
 
         if r.http == "GET":
@@ -8748,7 +8812,8 @@ class org_CapacityReport(S3Method):
         """
             Method to read the data
 
-            @param r: the S3Request
+            Args:
+                r: the CRUDRequest
         """
 
         # Read all the permitted data
@@ -8826,8 +8891,8 @@ class org_CapacityReport(S3Method):
         try:
             import xlwt
         except ImportError:
-            from core.io.codecs.xls import S3XLS
-            if current.auth.permission.format in S3Request.INTERACTIVE_FORMATS:
+            from core.resource.codecs.xls import S3XLS
+            if current.auth.permission.format in CRUDRequest.INTERACTIVE_FORMATS:
                 current.session.error = S3XLS.ERROR.XLWT_ERROR
                 redirect(URL(extension=""))
             else:
@@ -8933,9 +8998,10 @@ def org_logo_represent(org = None,
     """
         Produce an Org Logo DIV
 
-        @param org: the name of the Org to use (or None to lookup root_org)
-        @param fallback_org: the name of the fallback Org to use (if root_org lookup fails)
-        @param width: the width of the image
+        Args:
+            org: the name of the Org to use (or None to lookup root_org)
+            fallback_org: the name of the fallback Org to use (if root_org lookup fails)
+            width: the width of the image
     """
 
     logo = None
@@ -9030,11 +9096,12 @@ def org_organisation_list_layout(list_id, item_id, resource, rfields, record):
     """
         Default dataList item renderer for Organisations on the Profile pages
 
-        @param list_id: the HTML ID of the list
-        @param item_id: the HTML ID of the item
-        @param resource: the S3Resource to render
-        @param rfields: the S3ResourceFields to render
-        @param record: the record as dict
+        Args:
+            list_id: the HTML ID of the list
+            item_id: the HTML ID of the item
+            resource: the CRUDResource to render
+            rfields: the S3ResourceFields to render
+            record: the record as dict
     """
 
     record_id = record["org_organisation.id"]
@@ -9117,11 +9184,12 @@ def org_resource_list_layout(list_id, item_id, resource, rfields, record):
     """
         Default dataList item renderer for Resources on Profile pages
 
-        @param list_id: the HTML ID of the list
-        @param item_id: the HTML ID of the item
-        @param resource: the S3Resource to render
-        @param rfields: the S3ResourceFields to render
-        @param record: the record as dict
+        Args:
+            list_id: the HTML ID of the list
+            item_id: the HTML ID of the item
+            resource: the CRUDResource to render
+            rfields: the S3ResourceFields to render
+            record: the record as dict
     """
 
     record_id = record["org_resource.id"]

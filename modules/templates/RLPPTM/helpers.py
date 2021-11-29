@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
-
 """
-    Helper functions and classes for RLPPTM template
+    Helper functions and classes for RLPPTM
 
-    @license: MIT
+    License: MIT
 """
 
 import json
@@ -13,21 +11,23 @@ from gluon import current, Field, URL, \
                   SQLFORM, A, DIV, H4, H5, I, INPUT, LI, P, SPAN, TABLE, TD, TH, TR, UL
 
 from core import ICON, IS_FLOAT_AMOUNT, JSONERRORS, S3DateTime, \
-                 S3Method, S3Represent, s3_fullname, s3_mark_required, s3_str
+                 CRUDMethod, S3Represent, s3_fullname, s3_mark_required, s3_str
 
-from s3db.pr import pr_PersonRepresentContact, pr_default_realms
+from s3db.pr import pr_PersonRepresentContact
 
 # =============================================================================
 def get_role_realms(role):
     """
         Get all realms for which a role has been assigned
 
-        @param role: the role ID or role UUID
+        Args:
+            role: the role ID or role UUID
 
-        @returns: list of pe_ids the current user has the role for,
-                  None if the role is assigned site-wide, or an
-                  empty list if the user does not have the role, or
-                  no realm for the role
+        Returns:
+            list of pe_ids the current user has the role for,
+            None if the role is assigned site-wide, or an
+            empty list if the user does not have the role, or
+            no realm for the role
     """
 
     db = current.db
@@ -58,10 +58,12 @@ def get_managed_facilities(role="ORG_ADMIN", public_only=True):
     """
         Get test stations managed by the current user
 
-        @param role: the user role to consider
-        @param public_only: only include sites with PUBLIC=Y tag
+        Args:
+            role: the user role to consider
+            public_only: only include sites with PUBLIC=Y tag
 
-        @returns: list of site_ids
+        Returns:
+            list of site_ids
     """
 
 
@@ -98,10 +100,12 @@ def get_org_accounts(organisation_id):
     """
         Get all user accounts linked to an organisation
 
-        @param organisation_id: the organisation ID
+        Args:
+            organisation_id: the organisation ID
 
-        @returns: tuple (active, disabled, invited), each being
-                  a list of user accounts (auth_user Rows)
+        Returns:
+            tuple (active, disabled, invited), each being
+            a list of user accounts (auth_user Rows)
     """
 
     auth = current.auth
@@ -145,12 +149,14 @@ def get_role_users(role_uid, pe_id=None, organisation_id=None):
     """
         Look up users with a certain user role for a certain organisation
 
-        @param role_uid: the role UUID
-        @param pe_id: the pe_id of the organisation, or
-        @param organisation_id: the organisation_id
+        Args:
+            role_uid: the role UUID
+            pe_id: the pe_id of the organisation, or
+            organisation_id: the organisation_id
 
-        @returns: a dict {user_id: pe_id} of all active users with this
-                  role for the organisation
+        Returns:
+            a dict {user_id: pe_id} of all active users with this
+            role for the organisation
     """
 
     db = current.db
@@ -204,11 +210,13 @@ def get_role_emails(role_uid, pe_id=None, organisation_id=None):
         Look up the emails addresses of users with a certain user role
         for a certain organisation
 
-        @param role_uid: the role UUID
-        @param pe_id: the pe_id of the organisation, or
-        @param organisation_id: the organisation_id
+        Args:
+            role_uid: the role UUID
+            pe_id: the pe_id of the organisation, or
+            organisation_id: the organisation_id
 
-        @returns: a list of email addresses
+        Returns:
+            a list of email addresses
     """
 
     contacts = None
@@ -237,11 +245,13 @@ def get_role_hrs(role_uid, pe_id=None, organisation_id=None):
         Look up the HR records of users with a certain user role
         for a certain organisation
 
-        @param role_uid: the role UUID
-        @param pe_id: the pe_id of the organisation, or
-        @param organisation_id: the organisation_id
+        Args:
+            role_uid: the role UUID
+            pe_id: the pe_id of the organisation, or
+            organisation_id: the organisation_id
 
-        @returns: a list of hrm_human_resource IDs
+        Returns:
+            a list of hrm_human_resource IDs
     """
 
     hr_ids = None
@@ -272,7 +282,8 @@ def restrict_data_formats(r):
     """
         Restrict data exports (prevent S3XML/S3JSON of records)
 
-        @param r: the S3Request
+        Args:
+            r: the CRUDRequest
     """
 
     settings = current.deployment_settings
@@ -293,9 +304,10 @@ def assign_pending_invoices(billing_id, organisation_id=None, invoice_id=None):
         Auto-assign pending invoices in a billing to accountants,
         taking into account their current workload
 
-        @param billing_id: the billing ID
-        @param organisation_id: the ID of the accountant organisation
-        @param invoice_id: assign only this invoice
+        Args:
+            billing_id: the billing ID
+            organisation_id: the ID of the accountant organisation
+            invoice_id: assign only this invoice
     """
 
     db = current.db
@@ -371,9 +383,11 @@ def check_invoice_integrity(row):
     """
         Rheader-helper to check and report invoice integrity
 
-        @param row: the invoice record
+        Args:
+            row: the invoice record
 
-        @returns: integrity check result
+        Returns:
+            integrity check result
     """
 
     billing = current.s3db.fin_VoucherBilling(row.billing_id)
@@ -449,9 +463,11 @@ def can_cancel_debit(debit):
           that originally accepted the voucher (not even ADMIN-role can
           override this requirement)
 
-        @param debit: the debit (Row, must contain the debit pe_id)
+        Args:
+            debit: the debit (Row, must contain the debit pe_id)
 
-        @returns: True|False
+        Returns:
+            True|False
     """
 
     auth = current.auth
@@ -480,7 +496,7 @@ def can_cancel_debit(debit):
             # User has a site-wide VOUCHER_PROVIDER role, however
             # for cancellation of debits they must be affiliated
             # with the debit owner organisation
-            role_realms = pr_default_realms(user["pe_id"])
+            role_realms = current.s3db.pr_default_realms(user["pe_id"])
 
         return debit.pe_id in role_realms
 
@@ -493,8 +509,9 @@ def configure_binary_tags(resource, tag_components):
     """
         Configure representation of binary tags
 
-        @param resource: the S3Resource
-        @param tag_components: tuple|list of filtered tag component aliases
+        Args:
+            resource: the CRUDResource
+            tag_components: tuple|list of filtered tag component aliases
     """
 
     T = current.T
@@ -516,7 +533,8 @@ def workflow_tag_represent(options):
         Color-coded and icon-supported representation of
         facility approval workflow tags
 
-        @param options: the tag options as dict {value: label}
+        Args:
+            options: the tag options as dict {value: label}
     """
 
     icons = {"REVISE": "fa fa-exclamation-triangle",
@@ -552,11 +570,13 @@ def configure_workflow_tags(resource, role="applicant", record_id=None):
     """
         Configure facility approval workflow tags
 
-        @param resource: the org_facility resource
-        @param role: the user's role in the workflow (applicant|approver)
-        @param record_id: the facility record ID
+        Args:
+            resource: the org_facility resource
+            role: the user's role in the workflow (applicant|approver)
+            record_id: the facility record ID
 
-        @returns: the list of visible workflow tags [(label, selector)]
+        Returns:
+            the list of visible workflow tags [(label, selector)]
     """
 
     T = current.T
@@ -664,7 +684,8 @@ def facility_approval_workflow(site_id):
     """
         Update facility approval workflow tags
 
-        @param site_id: the site ID
+        Args:
+            site_id: the site ID
     """
 
     db = current.db
@@ -773,10 +794,12 @@ def facility_review_notification(site_id, tags):
     """
         Notify the OrgAdmin of a test station about the status of the review
 
-        @param site_id: the test facility site ID
-        @param tags: the current workflow tags
+        Args:
+            site_id: the test facility site ID
+            tags: the current workflow tags
 
-        @returns: error message on error, else None
+        Returns:
+            error message on error, else None
     """
 
     db = current.db
@@ -882,7 +905,8 @@ def add_organisation_default_tags(organisation_id):
     """
         Add default tags to a new organisation
 
-        @param organisation_id: the organisation record ID
+        Args:
+            organisation_id: the organisation record ID
     """
 
     db = current.db
@@ -939,8 +963,9 @@ def add_facility_default_tags(facility_id, approve=False):
     """
         Add default tags to a new facility
 
-        @param facility_id: the facility record ID
-        @param approve: whether called from approval-workflow
+        Args:
+            facility_id: the facility record ID
+            approve: whether called from approval-workflow
     """
 
     db = current.db
@@ -996,9 +1021,11 @@ def set_facility_code(facility_id):
     """
         Generate and set a unique facility code
 
-        @param facility_id: the facility ID
+        Args:
+            facility_id: the facility ID
 
-        @returns: the facility code
+        Returns:
+            the facility code
     """
 
     db = current.db
@@ -1036,12 +1063,14 @@ def applicable_org_types(organisation_id, group=None, represent=False):
     """
         Look up organisation types by OrgGroup-tag
 
-        @param organisation_id: the record ID of an existing organisation
-        @param group: alternatively, the organisation group name
-        @param represent: include type labels in the result
+        Args:
+            organisation_id: the record ID of an existing organisation
+            group: alternatively, the organisation group name
+            represent: include type labels in the result
 
-        @returns: a list of organisation type IDs, for filtering,
-                  or a dict {type_id: label}, for selecting
+        Returns:
+            a list of organisation type IDs, for filtering,
+            or a dict {type_id: label}, for selecting
     """
 
     db = current.db
@@ -1098,9 +1127,11 @@ def facility_map_popup(record):
     """
         Custom map popup for facilities
 
-        @param record: the facility record (Row)
+        Args:
+            record: the facility record (Row)
 
-        @returns: the map popup contents as DIV
+        Returns:
+            the map popup contents as DIV
     """
 
     db = current.db
@@ -1174,6 +1205,225 @@ def facility_map_popup(record):
     return DIV(title, details, _class="map-popup")
 
 # =============================================================================
+def update_daily_report(site_id, result_date, disease_id):
+    """
+        Update daily testing activity report (without subtotals per demographic)
+        - called when a new individual test result is registered
+
+        Args:
+            site_id: the test station site ID
+            result_date: the result date of the test
+            disease_id: the disease ID
+    """
+
+    db = current.db
+    s3db = current.s3db
+
+    table = s3db.disease_case_diagnostics
+
+    # Count records grouped by result
+    query = (table.site_id == site_id) & \
+            (table.disease_id == disease_id) & \
+            (table.result_date == result_date) & \
+            (table.deleted == False)
+    cnt = table.id.count()
+    rows = db(query).select(table.result,
+                            cnt,
+                            groupby = table.result,
+                            )
+    total = positive = 0
+    for row in rows:
+        num = row[cnt]
+        total += num
+        if row.disease_case_diagnostics.result == "POS":
+            positive += num
+
+    # Look up the daily report
+    rtable = s3db.disease_testing_report
+    query = (rtable.site_id == site_id) & \
+            (rtable.disease_id == disease_id) & \
+            (rtable.date == result_date) & \
+            (rtable.deleted == False)
+    report = db(query).select(rtable.id,
+                              rtable.tests_total,
+                              rtable.tests_positive,
+                              limitby = (0, 1),
+                              ).first()
+
+    if report:
+        # Update report if actual numbers are greater
+        if report.tests_total < total or report.tests_positive < positive:
+            report.update_record(tests_total = total,
+                                 tests_positive = positive,
+                                 )
+    else:
+        # Create report
+        report = {"site_id": site_id,
+                  "disease_id": disease_id,
+                  "date": result_date,
+                  "tests_total": total,
+                  "tests_positive": positive,
+                  }
+        report_id = rtable.insert(**report)
+        if report_id:
+            current.auth.s3_set_record_owner(rtable, report_id)
+            report["id"] = report_id
+            s3db.onaccept(rtable, report, method="create")
+
+# -----------------------------------------------------------------------------
+def update_daily_report_by_demographic(site_id, result_date, disease_id):
+    """
+        Update daily testing activity report (with subtotals per demographic)
+        - called when a new individual test result is registered
+
+        Args:
+            site_id: the test station site ID
+            result_date: the result date of the test
+            disease_id: the disease ID
+    """
+
+    db = current.db
+    s3db = current.s3db
+    set_record_owner = current.auth.s3_set_record_owner
+
+    table = s3db.disease_case_diagnostics
+    rtable = s3db.disease_testing_report
+    dtable = s3db.disease_testing_demographic
+
+    # Count individual results by demographic and result
+    query = (table.site_id == site_id) & \
+            (table.disease_id == disease_id) & \
+            (table.result_date == result_date) & \
+            (table.deleted == False)
+    cnt = table.id.count()
+    rows = db(query).select(table.demographic_id,
+                            table.result,
+                            cnt,
+                            groupby = (table.demographic_id, table.result),
+                            )
+
+    # Generate recorded-subtotals matrix
+    subtotals = {}
+    total = positive = 0
+    for row in rows:
+        record = row.disease_case_diagnostics
+        demographic_id = record.demographic_id
+        item = subtotals.get(demographic_id)
+        if not item:
+            item = subtotals[demographic_id] = {"tests_total": 0,
+                                                "tests_positive": 0,
+                                                }
+        num = row[cnt]
+        total += num
+        item["tests_total"] += num
+        if record.result == "POS":
+            positive += num
+            item["tests_positive"] += num
+
+    # Look up the daily report
+    query = (rtable.site_id == site_id) & \
+            (rtable.disease_id == disease_id) & \
+            (rtable.date == result_date) & \
+            (rtable.deleted == False)
+    report = db(query).select(rtable.id,
+                              rtable.tests_total,
+                              rtable.tests_positive,
+                              limitby = (0, 1),
+                              ).first()
+
+    if not report:
+        # Create a report with the recorded totals
+        report = {"site_id": site_id,
+                  "disease_id": disease_id,
+                  "date": result_date,
+                  "tests_total": total,
+                  "tests_positive": positive,
+                  }
+        report["id"] = report_id = rtable.insert(**report)
+        if report_id:
+            set_record_owner(rtable, report_id)
+            s3db.onaccept(rtable, report, method="create")
+
+            # Add subtotals per demographic
+            for demographic_id, item in subtotals.items():
+                subtotal = {"report_id": report_id,
+                            "demographic_id": demographic_id,
+                            "tests_total": item["tests_total"],
+                            "tests_positive": item["tests_positive"]
+                            }
+                subtotal_id = subtotal["id"] = dtable.insert(**subtotal)
+                set_record_owner(dtable, subtotal_id)
+                # We've already set the correct totals in the report:
+                #s3db.onaccept(dtable, subtotal, method="create")
+
+    else:
+        # Update the existing report with revised subtotals
+        report_id = report.id
+
+        # Get all current (reported) subtotals of this report
+        query = (dtable.report_id == report_id) & \
+                (dtable.deleted == False)
+        rows = db(query).select(dtable.id,
+                                dtable.demographic_id,
+                                dtable.tests_total,
+                                dtable.tests_positive,
+                                orderby = ~dtable.modified_on,
+                                )
+
+        # For each demographic, determine the recorded and reported subtotals
+        for demographic_id, item in subtotals.items():
+
+            # Recorded totals
+            recorded_total = item["tests_total"]
+            recorded_positive = item["tests_positive"]
+
+            # Reported totals
+            last_report = None
+            reported_total = reported_positive = 0
+            for row in rows:
+                if row.demographic_id == demographic_id:
+                    reported_total += row.tests_total
+                    reported_positive += row.tests_positive
+                    if not last_report:
+                        last_report = row
+
+            if not last_report:
+                # No subtotal for this demographic yet => create one
+                subtotal = {"report_id": report_id,
+                            "demographic_id": demographic_id,
+                            "tests_total": recorded_total,
+                            "tests_positive": recorded_positive,
+                            }
+                subtotal_id = subtotal["id"] = dtable.insert(**subtotal)
+                set_record_owner(dtable, subtotal_id)
+                # We do this in-bulk at the end:
+                #s3db.onaccept(dtable, subtotal, method="create")
+
+            elif reported_total < recorded_total or \
+                 reported_positive < recorded_positive:
+                # Update the last subtotal with the differences
+                last_report.update_record(
+                    tests_total = last_report.tests_total + \
+                                  max(recorded_total - reported_total, 1),
+                    tests_positive = last_report.tests_positive + \
+                                     max(recorded_positive - reported_positive, 0),
+                    )
+
+        # Get subtotals for all demographics under this report
+        query = (dtable.report_id == report_id) & \
+                (dtable.deleted == False)
+        total = dtable.tests_total.sum()
+        positive = dtable.tests_positive.sum()
+        row = db(query).select(total, positive).first()
+
+        # Update the overall report
+        query = (rtable.id == report_id) & \
+                (rtable.deleted == False)
+        db(query).update(tests_total = row[total],
+                         tests_positive = row[positive],
+                         )
+
+# =============================================================================
 class ServiceListRepresent(S3Represent):
 
     always_list = True
@@ -1183,10 +1433,11 @@ class ServiceListRepresent(S3Represent):
             Helper method to render list-type representations from
             bulk()-results.
 
-            @param value: the list
-            @param labels: the labels as returned from bulk()
-            @param show_link: render references as links, should
-                              be the same as used with bulk()
+            Args:
+                value: the list
+                labels: the labels as returned from bulk()
+                show_link: render references as links, should
+                           be the same as used with bulk()
         """
 
         show_link = show_link and self.show_link
@@ -1231,7 +1482,8 @@ class OrganisationRepresent(S3Represent):
             key and fields are not used, but are kept for API
             compatibility reasons.
 
-            @param values: the organisation IDs
+            Args:
+                values: the organisation IDs
         """
 
         db = current.db
@@ -1287,12 +1539,12 @@ class OrganisationRepresent(S3Represent):
         return rows
 
     # -------------------------------------------------------------------------
-    def represent_row(self, row, prefix=None):
+    def represent_row(self, row):
         """
             Represent a single Row
 
-            @param row: the org_organisation Row
-            @param prefix: the hierarchy prefix (unused here)
+            Args:
+                row: the org_organisation Row
         """
 
         name = s3_str(row.name)
@@ -1321,7 +1573,8 @@ class ContactRepresent(pr_PersonRepresentContact):
         """
             Represent a row
 
-            @param row: the Row
+            Args:
+                row: the Row
         """
 
         output = DIV(SPAN(s3_fullname(row),
@@ -1360,7 +1613,7 @@ class ContactRepresent(pr_PersonRepresentContact):
         return output
 
 # =============================================================================
-class InviteUserOrg(S3Method):
+class InviteUserOrg(CRUDMethod):
     """ Custom Method Handler to invite User Organisations """
 
     # -------------------------------------------------------------------------
@@ -1368,8 +1621,9 @@ class InviteUserOrg(S3Method):
         """
             Page-render entry point for REST interface.
 
-            @param r: the S3Request instance
-            @param attr: controller attributes
+            Args:
+                r: the CRUDRequest instance
+                attr: controller attributes
         """
 
         output = {}
@@ -1391,8 +1645,9 @@ class InviteUserOrg(S3Method):
         """
             Prepare and process invitation form
 
-            @param r: the S3Request instance
-            @param attr: controller attributes
+            Args:
+                r: the CRUDRequest instance
+                attr: controller attributes
         """
 
         T = current.T
@@ -1590,28 +1845,32 @@ class InviteUserOrg(S3Method):
             Generate a hash of the activation code using
             the registration key
 
-            @param key: the registration key
-            @param code: the activation code
+            Args:
+                key: the registration key
+                code: the activation code
 
-            @returns: the hash as string
+            Returns:
+                the hash as string
         """
 
         crypt = CRYPT(key=key, digest_alg="sha512", salt=None)
         return str(crypt(code.upper())[0])
 
 # =============================================================================
-class InvoicePDF(S3Method):
+class InvoicePDF(CRUDMethod):
     """
         REST Method to generate an invoice PDF
         - for external accounting archives
     """
 
+    # -------------------------------------------------------------------------
     def apply_method(self, r, **attr):
         """
             Generate a PDF of an Invoice
 
-            @param r: the S3Request instance
-            @param attr: controller attributes
+            Args:
+                r: the CRUDRequest instance
+                attr: controller attributes
         """
 
         if r.representation != "pdf":
@@ -1647,7 +1906,8 @@ class InvoicePDF(S3Method):
         """
             Generate the invoice header
 
-            @param r: the S3Request
+            Args:
+                r: the CRUDRequest
         """
 
         T = current.T
@@ -1692,7 +1952,8 @@ class InvoicePDF(S3Method):
         """
             Generate the invoice body
 
-            @param r: the S3Request
+            Args:
+                r: the CRUDRequest
         """
 
         T = current.T
@@ -1758,7 +2019,8 @@ class InvoicePDF(S3Method):
         """
             Generate the invoice footer
 
-            @param r: the S3Request
+            Args:
+                r: the CRUDRequest
         """
 
         T = current.T
@@ -1802,9 +2064,11 @@ class InvoicePDF(S3Method):
         """
             Look up data for the invoice header
 
-            @param invoice: the invoice record
+            Args:
+                invoice: the invoice record
 
-            @returns: dict with header data
+            Returns:
+                dict with header data
         """
 
         db = current.db
@@ -1890,9 +2154,11 @@ class InvoicePDF(S3Method):
         """
             Look up additional data for invoice body
 
-            @param invoice: the invoice record
+            Args:
+                invoice: the invoice record
 
-            @returns: dict with invoice data
+            Returns:
+                dict with invoice data
         """
 
         db = current.db
@@ -1917,18 +2183,20 @@ class InvoicePDF(S3Method):
         return data
 
 # =============================================================================
-class ClaimPDF(S3Method):
+class ClaimPDF(CRUDMethod):
     """
         REST Method to generate a claim PDF
         - for external accounting archives
     """
 
+    # -------------------------------------------------------------------------
     def apply_method(self, r, **attr):
         """
             Generate a PDF of a Claim
 
-            @param r: the S3Request instance
-            @param attr: controller attributes
+            Args:
+                r: the CRUDRequest instance
+                attr: controller attributes
         """
 
         if r.representation != "pdf":
@@ -1982,7 +2250,8 @@ class ClaimPDF(S3Method):
         """
             Generate the claim header
 
-            @param r: the S3Request
+            Args:
+                r: the CRUDRequest
         """
 
         T = current.T
@@ -2031,7 +2300,8 @@ class ClaimPDF(S3Method):
         """
             Generate the claim body
 
-            @param r: the S3Request
+            Args:
+                r: the CRUDRequest
         """
 
         T = current.T
@@ -2097,7 +2367,8 @@ class ClaimPDF(S3Method):
         """
             Generate the claim footer
 
-            @param r: the S3Request
+            Args:
+                r: the CRUDRequest
         """
 
         T = current.T
@@ -2141,9 +2412,11 @@ class ClaimPDF(S3Method):
         """
             Look up data for the claim header
 
-            @param claim: the claim record
+            Args:
+                claim: the claim record
 
-            @returns: dict with header data
+            Returns:
+                dict with header data
         """
 
         db = current.db
@@ -2241,9 +2514,11 @@ class ClaimPDF(S3Method):
         """
             Look up additional data for claim body
 
-            @param claim: the claim record
+            Args:
+                claim: the claim record
 
-            @returns: dict with claim data
+            Returns:
+                dict with claim data
         """
 
         db = current.db
@@ -2268,17 +2543,19 @@ class ClaimPDF(S3Method):
         return data
 
 # =============================================================================
-class TestFacilityInfo(S3Method):
+class TestFacilityInfo(CRUDMethod):
     """
         REST Method to report details/activities of a test facility
     """
 
+    # -------------------------------------------------------------------------
     def apply_method(self, r, **attr):
         """
             Report test facility information
 
-            @param r: the S3Request instance
-            @param attr: controller attributes
+            Args:
+                r: the CRUDRequest instance
+                attr: controller attributes
         """
 
         if r.http == "POST":
@@ -2326,7 +2603,7 @@ class TestFacilityInfo(S3Method):
                      },
                  "report": ["start","end"], - echoed from input, ISO-format dates YYYY-MM-DD
                  "activity":
-                    {"tests":59             - the total number of tests reported for the period
+                    {"tests": NN            - the total number of tests reported for the period
                     }
                  }
         """
@@ -2452,29 +2729,41 @@ class TestFacilityInfo(S3Method):
 
         # Look up activity data
         report = ref.get("report")
-        if isinstance(report, list) and len(report) == 2:
-            parse_date = current.calendar.parse_date
-            start, end = parse_date(s3_str(report[0])), \
-                         parse_date(s3_str(report[1]))
-            if start and end:
-                if start > end:
+        if report:
+            if isinstance(report, list) and len(report) == 2:
+
+                start, end = report
+
+                # Parse the dates, if any
+                parse_date = current.calendar.parse_date
+                start = parse_date(start) if start else False
+                end = parse_date(end) if end else False
+                if start is None or end is None:
+                    r.error(400, "Invalid date format in report parameter")
+                if start and end and start > end:
                     start, end = end, start
+
+                # Extract the totals from the database
                 table = s3db.disease_testing_report
-                query = (table.site_id == facility.site_id) & \
-                        (table.date >= start) & \
-                        (table.date <= end) & \
-                        (table.deleted == False)
+                query = (table.site_id == facility.site_id)
+                if start:
+                    query &= (table.date >= start)
+                if end:
+                    query &= (table.date <= end)
+                query &= (table.deleted == False)
                 total = table.tests_total.sum()
                 row = db(query).select(total).first()
                 tests_total = row[total]
                 if not tests_total:
                     tests_total = 0
-                output["report"] = [start.isoformat(), end.isoformat()]
+
+                # Add to output
+                output["report"] = [start.isoformat() if start else None,
+                                    end.isoformat() if end else None,
+                                    ]
                 output["activity"] = {"tests": tests_total}
             else:
-                r.error(400, "Invalid date format in report parameter")
-        else:
-            r.error(400, "Invalid report parameter format")
+                r.error(400, "Invalid report parameter format")
 
         # Return as JSON
         response = current.response

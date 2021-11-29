@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
+"""
+    Synchronization: Peer Repository Adapter for FTP
 
-""" S3 Synchronization: Peer Repository Adapter for FTP
-
-    @copyright: 2015-2021 (c) Sahana Software Foundation
-    @license: MIT
+    Copyright: 2015-2021 (c) Sahana Software Foundation
 
     Permission is hereby granted, free of charge, to any person
     obtaining a copy of this software and associated documentation
@@ -33,9 +31,8 @@ from io import StringIO
 
 from gluon import *
 
-from ...filters import S3URLQuery, FS
-from ...service import S3Request
-from ...io import S3Exporter
+from ...controller import CRUDRequest
+from ...resource import S3URLQuery, FS, S3Exporter
 
 from ..base import S3SyncBaseAdapter
 
@@ -52,7 +49,8 @@ class S3SyncAdapter(S3SyncBaseAdapter):
         """
             Register this site at the peer repository
 
-            @return: True to indicate success, otherwise False
+            Returns:
+                True to indicate success, otherwise False
         """
 
         # No registration required
@@ -63,7 +61,8 @@ class S3SyncAdapter(S3SyncBaseAdapter):
         """
             Login at the peer repository
 
-            @return: None if successful, otherwise the error
+            Returns:
+                None if successful, otherwise the error
         """
 
         repository = self.repository
@@ -96,7 +95,8 @@ class S3SyncAdapter(S3SyncBaseAdapter):
             Fetch updates from the repository and import them
             into the local database (Active Pull)
 
-            @param task: the task (sync_task Row)
+            Args:
+                task: the task (sync_task Row)
         """
 
         repository = self.repository
@@ -122,11 +122,13 @@ class S3SyncAdapter(S3SyncBaseAdapter):
             Extract new updates from the local database and send
             them to the peer repository (active push)
 
-            @param task: the synchronization task (sync_task Row)
+            Args:
+                task: the synchronization task (sync_task Row)
 
-            @return: tuple (error, mtime), with error=None if successful,
-                     else error=message, and mtime=modification timestamp
-                     of the youngest record sent
+            Returns
+                tuple (error, mtime), with error=None if successful,
+                else error=message, and mtime=modification timestamp
+                of the youngest record sent
         """
 
         repository = self.repository
@@ -267,10 +269,10 @@ class S3SyncAdapter(S3SyncBaseAdapter):
     def _get_data(self, resource, representation):
         """ Returns the representation data for the resource """
 
-        request = S3Request(prefix = resource.prefix,
-                            name = resource.name,
-                            extension = representation,
-                            )
+        request = CRUDRequest(prefix = resource.prefix,
+                              name = resource.name,
+                              extension = representation,
+                              )
 
         if request.transformable():
             return resource.export_xml(stylesheet = request.stylesheet(),

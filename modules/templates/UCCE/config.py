@@ -58,8 +58,6 @@ def config(settings):
     # 5: Apply Controller, Function & Table ACLs
     # 6: Apply Controller, Function, Table ACLs and Entity Realm
     # 7: Apply Controller, Function, Table ACLs and Entity Realm + Hierarchy
-    # 8: Apply Controller, Function, Table ACLs, Entity Realm + Hierarchy and Delegations
-
     settings.security.policy = 6 # Controller, Function, Table ACLs and Entity Realm
 
     # L10n settings
@@ -492,16 +490,16 @@ def config(settings):
         from templates.UCCE.controllers import dc_QuestionSave
 
         set_method = current.s3db.set_method
-        set_method("dc", "question",
+        set_method("dc_question",
                    method = "create_json",
                    action = dc_QuestionCreate())
-        set_method("dc", "question",
+        set_method("dc_question",
                    method = "image_delete",
                    action = dc_QuestionImageDelete())
-        set_method("dc", "question",
+        set_method("dc_question",
                    method = "image_upload",
                    action = dc_QuestionImageUpload())
-        set_method("dc", "question",
+        set_method("dc_question",
                    method = "update_json",
                    action = dc_QuestionSave())
 
@@ -677,28 +675,28 @@ def config(settings):
         from templates.UCCE.controllers import dc_TargetReportFilters
 
         set_method = current.s3db.set_method
-        set_method("dc", "target",
+        set_method("dc_target",
                    method = "activate",
                    action = dc_TargetActivate())
-        set_method("dc", "target",
+        set_method("dc_target",
                    method = "deactivate",
                    action = dc_TargetDeactivate())
-        set_method("dc", "target",
+        set_method("dc_target",
                    method = "delete_confirm",
                    action = dc_TargetDelete())
-        set_method("dc", "target",
+        set_method("dc_target",
                    method = "edit_confirm",
                    action = dc_TargetEdit())
-        set_method("dc", "target",
+        set_method("dc_target",
                    method = "name",
                    action = dc_TargetName())
-        set_method("dc", "target",
+        set_method("dc_target",
                    method = "l10n",
                    action = dc_TargetL10n())
-        set_method("dc", "target",
+        set_method("dc_target",
                    method = "report_custom",
                    action = dc_TargetReport())
-        set_method("dc", "target",
+        set_method("dc_target",
                    method = "report_filters",
                    action = dc_TargetReportFilters())
 
@@ -788,19 +786,19 @@ def config(settings):
         from templates.UCCE.controllers import dc_TemplateSave
 
         set_method = s3db.set_method
-        set_method("dc", "template",
+        set_method("dc_template",
                    method = "editor",
                    action = dc_TemplateEditor())
 
-        set_method("dc", "template",
+        set_method("dc_template",
                    method = "export_l10n",
                    action = dc_TemplateExportL10n())
 
-        set_method("dc", "template",
+        set_method("dc_template",
                    method = "upload_l10n",
                    action = dc_TemplateImportL10n())
 
-        set_method("dc", "template",
+        set_method("dc_template",
                    method = "update_json",
                    action = dc_TemplateSave())
 
@@ -1095,19 +1093,6 @@ def config(settings):
 
         s3db = current.s3db
 
-        s3db.project_l10n.language.requires = IS_EMPTY_OR(IS_ISO639_2_LANGUAGE_CODE(select = l10n_options,
-                                                                                    sort = True,
-                                                                                    translate = False,
-                                                                                    zero = "",
-                                                                                    ))
-
-        # Custom Component
-        s3db.add_components("project_project",
-                            project_l10n = {"joinby": "project_id",
-                                            "multiple": False,
-                                            },
-                            )
-
         current.response.s3.crud_strings[tablename] = Storage(
             label_create = T("New project"),
             #title_display = T("Project Details"),
@@ -1169,7 +1154,7 @@ def config(settings):
         from templates.UCCE.controllers import dc_ProjectDelete
 
         s3db = current.s3db
-        s3db.set_method("project", "project",
+        s3db.set_method("project_project",
                         method = "delete_confirm",
                         action = dc_ProjectDelete())
 
@@ -1186,18 +1171,7 @@ def config(settings):
 
             if r.id and not r.component and r.representation == "xls":
                 # Custom XLS Exporter to include all Responses.
-                r.set_handler("read", s3db.dc_TargetXLS(),
-                              http = ("GET", "POST"),
-                              representation = "xls"
-                              )
-            elif r.component_name == "target":
-                ltable = s3db.project_l10n
-                l10n = current.db(ltable.project_id == r.id).select(ltable.language,
-                                                                    limitby = (0,1)
-                                                                    ).first()
-                if l10n:
-                    s3db.dc_target_l10n.language.default = l10n.language
-
+                r.custom_action = s3db.dc_TargetXLS
             elif r.method == "datalist":
                 # Over-ride list_fields set in default prep
                 s3db.configure("project_project",

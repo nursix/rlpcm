@@ -90,8 +90,6 @@ def config(settings):
     # 5: Apply Controller, Function & Table ACLs
     # 6: Apply Controller, Function, Table ACLs and Entity Realm
     # 7: Apply Controller, Function, Table ACLs and Entity Realm + Hierarchy
-    # 8: Apply Controller, Function, Table ACLs, Entity Realm + Hierarchy and Delegations
-
     settings.security.policy = 6 # Controller, Function, Table ACLs and Entity Realm
 
     # Don't show version info on About page
@@ -142,8 +140,6 @@ def config(settings):
     # Projects
     # Don't use Beneficiaries
     settings.project.activity_beneficiaries = False
-    # Don't use Item Catalog for Distributions
-    settings.project.activity_items = False
     settings.project.activity_sectors = True
     # Links to Filtered Components for Donors & Partners
     settings.project.organisation_roles = {
@@ -1586,7 +1582,7 @@ S3.redraw_fns.push('tagit')''' % (T("Add tags here…"),
                              vars = {}))
 
         # Custom commit method to create an Activity Group from a Need
-        current.s3db.set_method("req", "need",
+        current.s3db.set_method("req_need",
                                 method = "commit",
                                 action = req_need_commit)
 
@@ -1713,7 +1709,7 @@ S3.redraw_fns.push('tagit')''' % (T("Add tags here…"),
             f.label = T("GN")
 
         # Custom method to (manually) update homepage statistics
-        s3db.set_method("req", "need_line",
+        s3db.set_method("req_need_line",
                         method = "update_stats",
                         action = req_need_line_update_stats,
                         )
@@ -1868,7 +1864,7 @@ S3.redraw_fns.push('tagit')''' % (T("Add tags here…"),
                        )
 
         # Custom commit method to create an Activity from a Need Line
-        s3db.set_method("req", "need_line",
+        s3db.set_method("req_need_line",
                         method = "commit",
                         action = req_need_line_commit)
 

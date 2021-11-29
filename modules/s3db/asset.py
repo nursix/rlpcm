@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
+"""
+    Assets Model
 
-""" Sahana Eden Assets Model
-
-    @copyright: 2009-2021 (c) Sahana Software Foundation
-    @license: MIT
+    Copyright: 2009-2021 (c) Sahana Software Foundation
 
     Permission is hereby granted, free of charge, to any person
     obtaining a copy of this software and associated documentation
@@ -27,10 +25,10 @@
     OTHER DEALINGS IN THE SOFTWARE.
 """
 
-__all__ = ("S3AssetModel",
-           "S3AssetHRModel",
-           "S3AssetTeamModel",
-           "S3AssetTelephoneModel",
+__all__ = ("AssetModel",
+           "AssetHRModel",
+           "AssetTeamModel",
+           "AssetTelephoneModel",
            #"asset_rheader",
            "asset_types",
            "asset_log_status",
@@ -80,7 +78,7 @@ asset_log_status = {"SET_BASE" : ASSET_LOG_SET_BASE,
                     }
 
 # =============================================================================
-class S3AssetModel(S3Model):
+class AssetModel(DataModel):
     """
         Asset Management
     """
@@ -832,7 +830,7 @@ $.filterOptionsS3({
             db(atable.id == asset_id).update(cond = form_vars.cond)
 
 # =============================================================================
-class S3AssetHRModel(S3Model):
+class AssetHRModel(DataModel):
     """
         Optionally link Assets to Human Resources
         - useful for staffing a vehicle
@@ -859,10 +857,10 @@ class S3AssetHRModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
 # =============================================================================
-class S3AssetTeamModel(S3Model):
+class AssetTeamModel(DataModel):
     """
         Optionally link Assets to Teams
     """
@@ -888,10 +886,10 @@ class S3AssetTeamModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
 # =============================================================================
-class S3AssetTelephoneModel(S3Model):
+class AssetTelephoneModel(DataModel):
     """
         Extend the Assset Module for Telephones:
             Usage Costs
@@ -953,7 +951,7 @@ class S3AssetTelephoneModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
 # =============================================================================
 def asset_get_current_log(asset_id):
@@ -1249,7 +1247,7 @@ def asset_controller():
     s3.prep = prep
 
     # Import pre-process
-    def import_prep(data):
+    def import_prep(tree):
         """
             Flag that this is an Import (to distinguish from Sync)
             @ToDo: Find Person records from their email addresses
@@ -1261,7 +1259,6 @@ def asset_controller():
         ctable = s3db.pr_contact
         ptable = s3db.pr_person
 
-        resource, tree = data
         elements = tree.getroot().xpath("/s3xml//resource[@name='pr_person']/data[@field='first_name']")
         persons = {}
         for element in elements:
@@ -1305,10 +1302,9 @@ def asset_controller():
         return output
     s3.postp = postp
 
-    output = current.rest_controller("asset", "asset",
-                                     rheader = asset_rheader,
-                                     )
-    return output
+    return current.crud_controller("asset", "asset",
+                                   rheader = asset_rheader,
+                                   )
 
 # =============================================================================
 class asset_AssetRepresent(S3Represent):
@@ -1336,7 +1332,8 @@ class asset_AssetRepresent(S3Represent):
             key and fields are not used, but are kept for API
             compatibility reasons.
 
-            @param values: the organisation IDs
+            Args:
+                values: the organisation IDs
         """
 
         db = current.db
@@ -1370,7 +1367,8 @@ class asset_AssetRepresent(S3Represent):
         """
             Represent a single Row
 
-            @param row: the asset_asset Row
+            Args:
+                row: the asset_asset Row
         """
 
         # Custom Row (with the item & brand left-joined)
@@ -1392,9 +1390,10 @@ class asset_AssetRepresent(S3Represent):
         """
             Represent a (key, value) as hypertext link.
 
-            @param k: the key (site_id)
-            @param v: the representation of the key
-            @param row: the row with this key
+            Args:
+                k: the key (site_id)
+                v: the representation of the key
+                row: the row with this key
         """
 
         if row:

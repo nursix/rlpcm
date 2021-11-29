@@ -1,11 +1,7 @@
-# -*- coding: utf-8 -*-
+"""
+    Disease Tracking Models
 
-""" Sahana Eden Disease Tracking Models
-
-    @ToDo Extend to Vector Tracking for Dengue/Malaria
-
-    @copyright: 2014-2021 (c) Sahana Software Foundation
-    @license: MIT
+    Copyright: 2014-2021 (c) Sahana Software Foundation
 
     Permission is hereby granted, free of charge, to any person
     obtaining a copy of this software and associated documentation
@@ -27,13 +23,15 @@
     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
     OTHER DEALINGS IN THE SOFTWARE.
+
+    TODO Extend to Vector Tracking for Dengue/Malaria
 """
 
 __all__ = ("DiseaseDataModel",
            "DiseaseMonitoringModel",
            "DiseaseCertificateModel",
-           "CaseTrackingModel",
-           "ContactTracingModel",
+           "DiseaseCaseTrackingModel",
+           "DiseaseContactTracingModel",
            "DiseaseStatsModel",
            "disease_rheader",
            )
@@ -65,7 +63,7 @@ MONITORING_UPGRADE = {"OBSERVATION": ("NONE",
                       }
 
 # =============================================================================
-class DiseaseDataModel(S3Model):
+class DiseaseDataModel(DataModel):
 
     names = ("disease_disease",
              "disease_disease_id",
@@ -211,7 +209,7 @@ class DiseaseDataModel(S3Model):
                            requires = IS_IN_SET(device_classes,
                                                 zero = None,
                                                 ),
-                           represent = S3Represent(options=device_classes),
+                           represent = represent_option(device_classes),
                            ),
                      Field("approved", "boolean",
                            default = True,
@@ -293,7 +291,8 @@ class DiseaseDataModel(S3Model):
         """
             Disease import update detection
 
-            @param item: the import item
+            Args:
+                item: the import item
         """
 
         data = item.data
@@ -357,26 +356,93 @@ class DiseaseDataModel(S3Model):
             record.update_record(available=False)
 
 # =============================================================================
-class DiseaseMonitoringModel(S3Model):
+class DiseaseMonitoringModel(DataModel):
     """ Data Model for Disease Monitoring """
 
-    names = ("disease_testing_report",
+    names = ("disease_demographic",
+             "disease_demographic_id",
+             "disease_testing_report",
+             "disease_testing_demographic",
              )
 
     def model(self):
 
         T = current.T
 
-        #db = current.db
+        db = current.db
         s3 = current.response.s3
+        settings = current.deployment_settings
+
+        crud_strings = s3.crud_strings
 
         define_table = self.define_table
-        crud_strings = s3.crud_strings
+        configure = self.configure
+
+        # ---------------------------------------------------------------------
+        # Demographics for disease monitoring/reporting
+        # - e.g. age groups, vulnerable groups...
+        #
+        tablename = "disease_demographic"
+        define_table(tablename,
+                     Field("code", length=16, notnull=True, unique=True,
+                           label = T("Code"),
+                           requires = [IS_NOT_EMPTY(),
+                                       IS_LENGTH(16, minsize=1),
+                                       IS_NOT_ONE_OF(db,
+                                                     "%s.code" % tablename,
+                                                     ),
+                                       ],
+                           comment = DIV(_class = "tooltip",
+                                         _title = "%s|%s" % (T("Code"),
+                                                             T("A unique code for this demographic"),
+                                                             ),
+                                         ),
+                           ),
+                     Field("name",
+                           label = T("Name"),
+                           requires = IS_NOT_EMPTY(),
+                           ),
+                     Field("obsolete", "boolean",
+                           default = False,
+                           label = T("Obsolete"),
+                           represent = s3_yes_no_represent,
+                           ),
+                     s3_comments(),
+                     *s3_meta_fields())
+
+        # CRUD Strings
+        crud_strings[tablename] = Storage(
+            label_create = T("Add Demographic"),
+            title_display = T("Demographic Details"),
+            title_list = T("Demographics"),
+            title_update = T("Edit Demographic"),
+            label_list_button = T("List Demographics"),
+            label_delete_button = T("Delete Demographic"),
+            msg_record_created = T("Demographic added"),
+            msg_record_modified = T("Demographic updated"),
+            msg_record_deleted = T("Demographic deleted"),
+            msg_list_empty = T("No Demographics currently defined"),
+            )
+
+        # Reusable Field
+        represent = S3Represent(lookup=tablename)
+        demographic_id = S3ReusableField("demographic_id", "reference %s" % tablename,
+                                         label = T("Demographic"),
+                                         represent = represent,
+                                         requires = IS_EMPTY_OR(
+                                                        IS_ONE_OF(db, "%s.id" % tablename,
+                                                                  represent,
+                                                                  filterby = "obsolete",
+                                                                  filter_opts = (False,),
+                                                                  )),
+                                         sortby = "name",
+                                         )
 
         # ---------------------------------------------------------------------
         # Testing Site Daily Summary Report
         # - for spatial-temporal analysis of testing activity and results
         #
+        subtotals = settings.get_disease_testing_report_by_demographic()
         tablename = "disease_testing_report"
         define_table(tablename,
                      self.disease_disease_id(
@@ -402,13 +468,46 @@ class DiseaseMonitoringModel(S3Model):
                      Field("tests_total", "integer",
                            label = T("Total Number of Tests"),
                            requires = IS_INT_IN_RANGE(0),
+                           writable = not subtotals,
                            ),
                      Field("tests_positive", "integer",
                            label = T("Number of Positive Test Results"),
                            requires = IS_INT_IN_RANGE(0),
+                           writable = not subtotals,
                            ),
                      s3_comments(),
                      *s3_meta_fields())
+
+        # Components
+        self.add_components(tablename,
+                            disease_testing_demographic = "report_id",
+                            )
+
+        # CRUD Form
+        if subtotals:
+            crud_fields = ["disease_id",
+                           "site_id",
+                           "date",
+                           "tests_total",
+                           "tests_positive",
+                           S3SQLInlineComponent("testing_demographic",
+                                                label = T("Details"),
+                                                fields = ["demographic_id",
+                                                          "tests_total",
+                                                          "tests_positive",
+                                                          ],
+                                                ),
+                           "comments",
+                           ]
+        else:
+            crud_fields = ["disease_id",
+                           "site_id",
+                           "date",
+                           "tests_total",
+                           "tests_positive",
+                           "comments",
+                           ]
+        crud_form = S3SQLCustomForm(*crud_fields)
 
         # Filter Widgets
         filter_widgets = [S3TextFilter(["site_id$name", "comments"],
@@ -428,10 +527,10 @@ class DiseaseMonitoringModel(S3Model):
                        ]
 
         # Report options
-        facts = ((T("Number of Tests"), "sum(tests_total)"),
+        facts = [(T("Number of Tests"), "sum(tests_total)"),
                  (T("Number of Positive Test Results"), "sum(tests_positive)"),
                  (T("Number of Reports"), "count(id)"),
-                 )
+                 ]
         axes = ["site_id",
                 "site_id$location_id$L2",
                 "site_id$location_id$L3",
@@ -448,14 +547,26 @@ class DiseaseMonitoringModel(S3Model):
                          },
             }
 
+        timeplot_options = {
+            "fact": facts,
+            "timestamp": ((T("per interval"), "date,date"),
+                          (T("cumulative"), "date"),
+                          ),
+            "defaults": {"fact": facts[:2],
+                         "timestamp": "date,date",
+                         },
+            }
+
         # Table Configuration
-        self.configure(tablename,
-                       list_fields = list_fields,
-                       filter_widgets = filter_widgets,
-                       onvalidation = self.testing_report_onvalidation,
-                       orderby = "%s.date desc" % tablename,
-                       report_options = report_options,
-                       )
+        configure(tablename,
+                  crud_form = crud_form,
+                  list_fields = list_fields,
+                  filter_widgets = filter_widgets,
+                  onvalidation = self.testing_report_onvalidation,
+                  orderby = "%s.date desc" % tablename,
+                  report_options = report_options,
+                  timeplot_options = timeplot_options,
+                  )
 
         # CRUD Strings
         crud_strings[tablename] = Storage(
@@ -472,18 +583,103 @@ class DiseaseMonitoringModel(S3Model):
             )
 
         # ---------------------------------------------------------------------
+        # Testing activity data per demographic
+        # - component of testing reports
+        #
+        # TODO better represent (site+date)
+        report_represent = S3Represent(lookup = "disease_testing_report",
+                                       fields = ["date"],
+                                       )
+        tablename = "disease_testing_demographic"
+        define_table(tablename,
+                     Field("report_id", "reference disease_testing_report",
+                           label = T("Report"),
+                           represent = report_represent,
+                           requires = IS_ONE_OF(db, "disease_testing_report.id",
+                                                report_represent,
+                                                ),
+                           ),
+                     demographic_id(
+                         empty = False,
+                         label = T("Subject Group##med"),
+                         ondelete = "CASCADE",
+                         ),
+                     Field("tests_total", "integer",
+                           label = T("Total Number of Tests"),
+                           requires = IS_INT_IN_RANGE(0),
+                           ),
+                     Field("tests_positive", "integer",
+                           label = T("Number of Positive Test Results"),
+                           requires = IS_INT_IN_RANGE(0),
+                           ),
+                     s3_comments(),
+                     *s3_meta_fields())
+
+        # List fields
+        list_fields = ["report_id$site_id",
+                       "report_id$date",
+                       "demographic_id",
+                       "tests_total",
+                       "tests_positive",
+                       "report_id$comments",
+                       ]
+
+        # Filter Widgets
+        filter_widgets = [S3TextFilter(["report_id$site_id$name",
+                                        "report_id$comments",
+                                        ],
+                                       label = T("Search"),
+                                       ),
+                          S3DateFilter("report_id$date",
+                                       ),
+                          ]
+
+        # Report options
+        facts = ((T("Number of Tests"), "sum(tests_total)"),
+                 (T("Number of Positive Test Results"), "sum(tests_positive)"),
+                 (T("Number of Reports"), "count(report_id)"),
+                 )
+        axes = ["report_id$site_id",
+                "report_id$site_id$location_id$L2",
+                "report_id$site_id$location_id$L3",
+                "demographic_id",
+                "report_id$disease_id",
+                ]
+        report_options = {
+            "rows": axes,
+            "cols": axes,
+            "fact": facts,
+            "defaults": {"rows": axes[1],
+                         "cols": None,
+                         "fact": facts[0],
+                         "totals": True,
+                         },
+            }
+
+        configure(tablename,
+                  filter_widgets = filter_widgets,
+                  list_fields = list_fields,
+                  onvalidation = self.testing_demographic_onvalidation,
+                  onaccept = self.testing_demographic_onaccept,
+                  ondelete = self.testing_demographic_ondelete,
+                  report_options = report_options,
+                  )
+
+        # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return {"disease_demographic_id": demographic_id,
+                }
 
     # -------------------------------------------------------------------------
     @staticmethod
     def defaults():
         """ Safe defaults for names in case the module is disabled """
 
-        #dummy = S3ReusableField.dummy
+        dummy = S3ReusableField.dummy
 
-        return {}
+        return {"disease_demographic_id": dummy("demographic_id"),
+                }
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -551,8 +747,93 @@ class DiseaseMonitoringModel(S3Model):
             if positive > total:
                 form.errors["tests_positive"] = T("Number of positive results cannot be greater than number of tests")
 
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def testing_demographic_onvalidation(form):
+        """
+            Onvalidation of testing_demographic:
+            - check numbers for plausibility
+        """
+
+        T = current.T
+
+        form_vars = form.vars
+
+        # Validate numbers
+        total = form_vars.get("tests_total")
+        positive = form_vars.get("tests_positive")
+        if total is not None and positive is not None:
+            if positive > total:
+                form.errors["tests_positive"] = T("Number of positive results cannot be greater than number of tests")
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def update_report_from_demographics(report_id):
+
+        db = current.db
+        s3db = current.s3db
+
+        # Get totals for all demographics under this report
+        table = s3db.disease_testing_demographic
+        query = (table.report_id == report_id) & \
+                (table.deleted == False)
+        tests_total = table.tests_total.sum()
+        tests_positive = table.tests_positive.sum()
+        row = db(query).select(tests_total, tests_positive).first()
+
+        # Update the report
+        rtable = s3db.disease_testing_report
+        query = (rtable.id == report_id) & \
+                (rtable.deleted == False)
+        db(query).update(tests_total = row[tests_total],
+                         tests_positive = row[tests_positive],
+                         )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def testing_demographic_onaccept(cls, form):
+        """
+            Onaccept of disease_testing_demographic:
+            - update the totals in the corresponding report
+        """
+
+        # Get record ID
+        form_vars = form.vars
+        if "id" in form_vars:
+            record_id = form_vars.id
+        elif hasattr(form, "record_id"):
+            record_id = form.record_id
+        else:
+            return
+
+        table = current.s3db.disease_testing_demographic
+
+        report_id = form_vars.get("report_id")
+        if not report_id:
+            record = current.db(table.id == record_id).select(table.report_id,
+                                                              limitby = (0, 1),
+                                                              ).first()
+            if record:
+                report_id = record.report_id
+
+        if report_id:
+            cls.update_report_from_demographics(report_id)
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def testing_demographic_ondelete(cls, row):
+        """
+            Ondelete of disease_testing_demographic:
+            - update the totals in the corresponding report
+        """
+
+        report_id = row.report_id
+
+        if report_id:
+            cls.update_report_from_demographics(report_id)
+
 # =============================================================================
-class DiseaseCertificateModel(S3Model):
+class DiseaseCertificateModel(DataModel):
     """
         Model to manage disease-related health certificates
     """
@@ -583,7 +864,7 @@ class DiseaseCertificateModel(S3Model):
         self.define_table(tablename,
                           self.disease_disease_id(),
                           Field("type",
-                                represent = S3Represent(options = hcert_types),
+                                represent = represent_option(hcert_types),
                                 requires = IS_IN_SET(hcert_types),
                                 ),
                           Field("instance_id",
@@ -595,7 +876,7 @@ class DiseaseCertificateModel(S3Model):
                           Field("vhash", "text",
                                 ),
                           Field("status",
-                                represent = S3Represent(options = hcert_status),
+                                represent = represent_option(hcert_status),
                                 requires = IS_IN_SET(hcert_status),
                                 ),
                           Field("errors", "text",
@@ -619,7 +900,7 @@ class DiseaseCertificateModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -628,10 +909,10 @@ class DiseaseCertificateModel(S3Model):
 
         #dummy = S3ReusableField.dummy
 
-        return {}
+        return None
 
 # =============================================================================
-class CaseTrackingModel(S3Model):
+class DiseaseCaseTrackingModel(DataModel):
 
     names = ("disease_case",
              "disease_case_id",
@@ -665,7 +946,7 @@ class CaseTrackingModel(S3Model):
                             "CONFIRMED-POS": T("Confirmed Positive"),
                             "CONFIRMED-NEG": T("Confirmed Negative"),
                             }
-        diagnosis_status_represent = S3Represent(options = diagnosis_status)
+        diagnosis_status_represent = represent_option(diagnosis_status)
 
         # =====================================================================
         # Monitoring Levels
@@ -680,7 +961,7 @@ class CaseTrackingModel(S3Model):
                              # Follow-up after recovery:
                              "FOLLOW-UP": T("Post-Recovery Follow-Up"),
                              }
-        monitoring_level_represent = S3Represent(options = monitoring_levels)
+        monitoring_level_represent = represent_option(monitoring_levels)
         # =====================================================================
         # Illness status
         #
@@ -691,7 +972,7 @@ class CaseTrackingModel(S3Model):
                           "DECEASED": T("Deceased, Clinical Signs Positive"),
                           "RECOVERED": T("Recovered"),
                           }
-        illness_status_represent = S3Represent(options = illness_status)
+        illness_status_represent = represent_option(illness_status)
 
         # =====================================================================
         # Case
@@ -991,7 +1272,7 @@ class CaseTrackingModel(S3Model):
                      ("VACCINATED", T("Vaccinated")),
                      ("OTHER", T("Other")),
                      )
-        occasion_represent = S3Represent(options=dict(occasions))
+        occasion_represent = represent_option(dict(occasions))
         tablename = "disease_case_treatment"
         define_table(tablename,
                      case_id(empty=False),
@@ -1067,6 +1348,12 @@ class CaseTrackingModel(S3Model):
                                      readable = False,
                                      writable = False,
                                      ),
+                     # Optional link to demographic for disease monitoring
+                     self.disease_demographic_id(
+                            label = T("Subject Group##med"),
+                            readable = False,
+                            writable = False,
+                            ),
                      # @todo: make a lookup table in DiseaseDataModel:
                      Field("probe_type"),
                      Field("probe_number", length=64, unique=True,
@@ -1078,7 +1365,7 @@ class CaseTrackingModel(S3Model):
                                  future = 0,
                                  ),
                      Field("probe_status",
-                           represent = S3Represent(options = probe_status),
+                           represent = represent_option(probe_status),
                            requires = IS_IN_SET(probe_status),
                            default = "PENDING",
                            ),
@@ -1141,8 +1428,9 @@ class CaseTrackingModel(S3Model):
         """
             Find the case record for a person for a disease
 
-            @param person_id: the person record ID
-            @param disease_id: the disease record ID
+            Args:
+                person_id: the person record ID
+                disease_id: the disease record ID
         """
 
         ctable = current.s3db.disease_case
@@ -1186,7 +1474,8 @@ class CaseTrackingModel(S3Model):
         """
             Case import update detection
 
-            @param item: the import item
+            Args:
+                item: the import item
         """
 
         data = item.data
@@ -1345,7 +1634,6 @@ class CaseTrackingModel(S3Model):
 class disease_CaseRepresent(S3Represent):
 
     def __init__(self):
-        """ Constructor """
 
         super(disease_CaseRepresent, self).__init__(lookup = "disease_case")
 
@@ -1354,9 +1642,10 @@ class disease_CaseRepresent(S3Represent):
         """
             Custom rows lookup
 
-            @param key: the key Field
-            @param values: the values
-            @param fields: unused (retained for API compatibility)
+            Args:
+                key: the key Field
+                values: the values
+                fields: unused (retained for API compatibility)
         """
 
         s3db = current.s3db
@@ -1387,7 +1676,8 @@ class disease_CaseRepresent(S3Represent):
         """
             Represent a row
 
-            @param row: the Row
+            Args:
+                row: the Row
         """
 
         try:
@@ -1426,7 +1716,7 @@ class disease_CaseRepresent(S3Represent):
             return full_name
 
 # =============================================================================
-class ContactTracingModel(S3Model):
+class DiseaseContactTracingModel(DataModel):
 
     names = ("disease_tracing",
              "disease_exposure",
@@ -1471,7 +1761,7 @@ class ContactTracingModel(S3Model):
                            default = "OPEN",
                            label = T("Tracing Status"),
                            requires = IS_IN_SET(contact_tracing_status, zero=None),
-                           represent = S3Represent(options=contact_tracing_status),
+                           represent = represent_option(contact_tracing_status),
                            ),
                      s3_comments(),
                      *s3_meta_fields())
@@ -1517,7 +1807,7 @@ class ContactTracingModel(S3Model):
                             "PARTIAL": T("Partial"),
                             "FULL": T("Full"),
                             }
-        protection_level_represent = S3Represent(options = protection_level)
+        protection_level_represent = represent_option(protection_level)
 
         # =====================================================================
         # Exposure Type
@@ -1526,7 +1816,7 @@ class ContactTracingModel(S3Model):
                          "DIRECT": T("Direct"),
                          "INDIRECT": T("Indirect"),
                          }
-        exposure_type_represent = S3Represent(options = exposure_type)
+        exposure_type_represent = represent_option(exposure_type)
 
         # =====================================================================
         # Exposure Risk Level
@@ -1536,7 +1826,7 @@ class ContactTracingModel(S3Model):
                          "LOW": T("Low risk exposure"),
                          "HIGH": T("High risk exposure"),
                          }
-        exposure_risk_represent = S3Represent(options = exposure_risk)
+        exposure_risk_represent = represent_option(exposure_risk)
 
         # =====================================================================
         # Exposure: when and how was a person exposed to the disease?
@@ -1613,19 +1903,19 @@ class ContactTracingModel(S3Model):
             msg_list_empty = T("No Exposure Information currently registered"))
 
         # Pass names back to global scope (s3.*)
-        return {}
+        return None
 
     # -------------------------------------------------------------------------
     @staticmethod
     def defaults():
 
-        return {}
+        return None
 
     # -------------------------------------------------------------------------
     @staticmethod
     def exposure_onaccept(form):
         """
-            @todo: docstring
+            TODO docstring
         """
 
         formvars = form.vars
@@ -1654,7 +1944,7 @@ class ContactTracingModel(S3Model):
 # =============================================================================
 def disease_propagate_case_status(case_id):
     """
-        @todo: docstring
+        TODO docstring
     """
 
     db = current.db
@@ -1736,7 +2026,7 @@ def disease_propagate_case_status(case_id):
 # =============================================================================
 def disease_create_case(disease_id, person_id, monitoring_level=None):
     """
-        @todo: docstring
+        TODO docstring
     """
 
     ctable = current.s3db.disease_case
@@ -1765,7 +2055,7 @@ def disease_create_case(disease_id, person_id, monitoring_level=None):
 # =============================================================================
 def disease_upgrade_monitoring(case_id, level, case=None):
     """
-        @todo: docstring
+        TODO docstring
     """
 
     if level not in MONITORING_UPGRADE:
@@ -1789,7 +2079,7 @@ def disease_upgrade_monitoring(case_id, level, case=None):
         case.update_record(monitoring_level = level)
 
 # =============================================================================
-class DiseaseStatsModel(S3Model):
+class DiseaseStatsModel(DataModel):
     """
         Disease Statistics:
             Cases:
@@ -2271,10 +2561,11 @@ class DiseaseStatsModel(S3Model):
             Calculates the disease_stats_aggregate for a specific parameter at a
             specific location over the range of dates.
 
-            @param location_id: location to aggregate at
-            @param children: locations to aggregate from
-            @param parameter_id: arameter to aggregate
-            @param dates: dates to aggregate for (as JSON string)
+            Args:
+                location_id: location to aggregate at
+                children: locations to aggregate from
+                parameter_id: arameter to aggregate
+                dates: dates to aggregate for (as JSON string)
         """
 
         db = current.db

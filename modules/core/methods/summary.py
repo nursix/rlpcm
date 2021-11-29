@@ -1,11 +1,7 @@
-# -*- coding: utf-8 -*-
+"""
+    Summary (Multi-paradigm multi-record view)
 
-""" Resource Summary Pages
-
-    @copyright: 2013-2021 (c) Sahana Software Foundation
-    @license: MIT
-
-    @requires: U{B{I{gluon}} <http://web2py.com>}
+    Copyright: 2013-2021 (c) Sahana Software Foundation
 
     Permission is hereby granted, free of charge, to any person
     obtaining a copy of this software and associated documentation
@@ -32,11 +28,13 @@
 from gluon import current, A, DIV, LI, UL
 
 from ..filters import S3FilterForm
-from ..gis import MAP
-from ..service import S3Method
+from ..tools import get_crud_string
+
+from .base import CRUDMethod
+from .crud import S3CRUD
 
 # =============================================================================
-class S3Summary(S3Method):
+class S3Summary(CRUDMethod):
     """ Resource Summary Pages """
 
     # -------------------------------------------------------------------------
@@ -44,8 +42,9 @@ class S3Summary(S3Method):
         """
             Entry point for REST interface
 
-            @param r: the S3Request
-            @param attr: controller attributes
+            Args:
+                r: the CRUDRequest
+                attr: controller attributes
         """
 
         if "w" in r.get_vars:
@@ -60,8 +59,9 @@ class S3Summary(S3Method):
         """
             Render the summary page
 
-            @param r: the S3Request
-            @param attr: controller attributes
+            Args:
+                r: the CRUDRequest
+                attr: controller attributes
         """
 
         output = {}
@@ -73,8 +73,7 @@ class S3Summary(S3Method):
         config = self._get_config(resource)
 
         # Page title
-        crud_string = self.crud_string
-        title = crud_string(self.tablename, "title_list")
+        title = get_crud_string(self.tablename, "title_list")
         output["title"] = title
 
         # Tabs
@@ -157,12 +156,12 @@ class S3Summary(S3Method):
                     handler = r.get_widget_handler(method)
                     if handler is None:
                         # Fall back to CRUD
-                        handler = resource.crud
+                        handler = S3CRUD()
                     if handler is not None:
                         if method == "datatable":
                             # Assume that we have a FilterForm, so disable Quick Search
                             dtargs = attr.get("dtargs", {})
-                            dtargs["dt_searching"] = "false"
+                            dtargs["dt_searching"] = False
                             attr["dtargs"] = dtargs
                         content = handler(r,
                                           method=method,
@@ -173,6 +172,7 @@ class S3Summary(S3Method):
                         r.error(405, current.ERROR.BAD_METHOD)
 
                 # Add content to section
+                from ..gis import MAP
                 if isinstance(content, dict):
                     if r.http == "POST" and content.get("success"):
                         # Form successfully processed: behave like the
@@ -296,8 +296,9 @@ class S3Summary(S3Method):
         """
             Render a specific widget for pulling-in via AJAX
 
-            @param r: the S3Request
-            @param attr: controller attributes
+            Args:
+                r: the CRUDRequest
+                attr: controller attributes
         """
 
         # Get Summary Page Configuration
@@ -334,7 +335,8 @@ class S3Summary(S3Method):
         """
             Get the summary page configuration
 
-            @param resource: the target S3Resource
+            Args:
+                resource: the target CRUDResource
         """
 
         get_config = resource.get_config

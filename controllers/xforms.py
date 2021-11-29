@@ -31,11 +31,10 @@ def forms():
         method = ["xform.%s" % extension]
         if len(args) > 1:
             method.insert(0, args[1])
-        r = s3_request(prefix, name,
-                       args = method,
-                       extension = None,
-                       )
-        r.set_handler("xform", S3XForms)
+        r = crud_request(prefix, name,
+                         args = method,
+                         extension = None,
+                         )
         output = r()
     else:
         # Form list
@@ -348,7 +347,7 @@ def csvheader(parent, nodelist):
 def importxml(db, xmlinput):
     """
         Converts the XML to a CSV compatible with the import_from_csv_file of web2py
-        @ToDo: rewrite this to go via S3Resource for proper Auth checking, Audit.
+        @ToDo: rewrite this to go via CRUDResource for proper Auth checking, Audit.
 
         @todo: deprecate
     """

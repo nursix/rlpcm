@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
+"""
+    Beneficiary Registry and Case Management Models
 
-""" Sahana Eden Beneficiary Registry and Case Management Models
-
-    @copyright: 2018-2021 (c) Sahana Software Foundation
-    @license: MIT
+    Copyright: 2018-2021 (c) Sahana Software Foundation
 
     Permission is hereby granted, free of charge, to any person
     obtaining a copy of this software and associated documentation
@@ -72,7 +70,7 @@ from ..core import *
 CASE_GROUP = 7
 
 # =============================================================================
-class BRCaseModel(S3Model):
+class BRCaseModel(DataModel):
     """
         Model to register cases ("case registry") and track their processing
         status; uses pr_person for beneficiary person data
@@ -300,14 +298,14 @@ class BRCaseModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
     # -------------------------------------------------------------------------
     @staticmethod
     def defaults():
         """ Safe defaults for names in case the module is disabled """
 
-        return {}
+        return None
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -316,7 +314,8 @@ class BRCaseModel(S3Model):
             Onaccept routine for case statuses:
                 - only one status can be the default
 
-            @param form: the FORM
+            Args:
+                form: the FORM
         """
 
         form_vars = form.vars
@@ -340,7 +339,8 @@ class BRCaseModel(S3Model):
             Wrapper for case_onaccept when called during create
             rather than update
 
-            @param form: the FORM
+            Args:
+                form: the FORM
         """
 
         cls.case_onaccept(form, create=True)
@@ -353,8 +353,9 @@ class BRCaseModel(S3Model):
             - auto-create active appointments
             - count household size for new cases
 
-            @param form: the FORM
-            @param create: perform additional actions for new cases
+            Args:
+                form: the FORM
+                create: perform additional actions for new cases
         """
 
         db = current.db
@@ -468,7 +469,7 @@ class BRCaseModel(S3Model):
 # =============================================================================
 # Process Models
 # =============================================================================
-class BRCaseActivityModel(S3Model):
+class BRCaseActivityModel(DataModel):
     """
         Model for problem/needs-oriented case processing: activities taking
         place in response to individual needs of the beneficiary
@@ -923,7 +924,8 @@ class BRCaseActivityModel(S3Model):
             - only one status can be the default
             - only one status can be the default closure
 
-            @param form: the FORM
+            Args:
+                form: the FORM
         """
 
         form_vars = form.vars
@@ -994,7 +996,7 @@ class BRCaseActivityModel(S3Model):
                 data["end_date"] = None
 
 # =============================================================================
-class BRAppointmentModel(S3Model):
+class BRAppointmentModel(DataModel):
     """
         Model for workflow-oriented case processing: cases must pass a number
         of predefined processing steps (=appointments) in order to achieve a
@@ -1109,8 +1111,7 @@ class BRAppointmentModel(S3Model):
                            requires = IS_IN_SET(appointment_status_opts,
                                                 zero = None,
                                                 ),
-                           represent = S3Represent(options = appointment_status_opts,
-                                                   ),
+                           represent = represent_option(appointment_status_opts),
                            ),
                      s3_comments(),
                      *s3_meta_fields())
@@ -1139,19 +1140,19 @@ class BRAppointmentModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
     # -------------------------------------------------------------------------
     @staticmethod
     def defaults():
         """ Safe defaults for names in case the module is disabled """
 
-        return {}
+        return None
 
 # =============================================================================
 # Category Models
 # =============================================================================
-class BRNeedsModel(S3Model):
+class BRNeedsModel(DataModel):
     """ Model for Need Categories """
 
     names = ("br_need",
@@ -1275,7 +1276,7 @@ class BRNeedsModel(S3Model):
 # =============================================================================
 # Assistance Models
 # =============================================================================
-class BRAssistanceModel(S3Model):
+class BRAssistanceModel(DataModel):
     """
         Generic model to track individual measures of assistance
     """
@@ -1745,7 +1746,8 @@ class BRAssistanceModel(S3Model):
                 - RESTRICT  => block deletion cascade
                 - otherwise => clean up the list:reference
 
-            @param row: the br_assistance_theme Row to be deleted
+            Args:
+                row: the br_assistance_theme Row to be deleted
         """
 
         db = current.db
@@ -1780,7 +1782,8 @@ class BRAssistanceModel(S3Model):
             - only one status can be the default
             - only one status can be the default termination
 
-            @param form: the FORM
+            Args:
+                form: the FORM
         """
 
         form_vars = form.vars
@@ -1869,11 +1872,13 @@ class BRAssistanceModel(S3Model):
         """
             DRY helper to find or create a case activity matching a need_id
 
-            @param person_id: the beneficiary person ID
-            @param need_id: the need ID (or a list of need IDs)
-            @param human_resource_id: the HR responsible
+            Args:
+                person_id: the beneficiary person ID
+                need_id: the need ID (or a list of need IDs)
+                human_resource_id: the HR responsible
 
-            @returns: a br_case_activity record ID
+            Returns:
+                a br_case_activity record ID
         """
 
         if not person_id:
@@ -2041,7 +2046,8 @@ class BRAssistanceModel(S3Model):
         """
             Configure inline-form for assistance measures
 
-            @returns: S3SQLInlineComponent
+            Returns:
+                S3SQLInlineComponent
         """
 
         T = current.T
@@ -2093,7 +2099,7 @@ class BRAssistanceModel(S3Model):
                                         )
 
 # =============================================================================
-class BRAssistanceOfferModel(S3Model):
+class BRAssistanceOfferModel(DataModel):
     """
         Generic model to track individual measures of assistance
     """
@@ -2205,8 +2211,7 @@ class BRAssistanceOfferModel(S3Model):
                            default = "AVL",
                            label = T("Availability"),
                            requires = IS_IN_SET(offer_availability, zero=None, sort=False),
-                           represent = S3Represent(options=dict(offer_availability),
-                                                   ),
+                           represent = represent_option(dict(offer_availability)),
                            ),
                      s3_date(label = T("Available from"),
                              default = "now",
@@ -2220,8 +2225,7 @@ class BRAssistanceOfferModel(S3Model):
                            default = "NEW",
                            label = T("Status"),
                            requires = IS_IN_SET(offer_status, zero=None, sort=False),
-                           represent = S3Represent(options=dict(offer_status),
-                                                   ),
+                           represent = represent_option(dict(offer_status)),
                            ),
                      s3_comments(),
                      *s3_meta_fields())
@@ -2461,14 +2465,14 @@ class BRAssistanceOfferModel(S3Model):
             form.errors[error_field] = error
 
 # =============================================================================
-class BRDistributionModel(S3Model):
+class BRDistributionModel(DataModel):
     """
         Model to process+track relief item distributions to beneficiaries
     """
     pass
 
 # =============================================================================
-class BRPaymentModel(S3Model):
+class BRPaymentModel(DataModel):
     """
         Model to process+track benefits payments to beneficiaries
     """
@@ -2477,7 +2481,7 @@ class BRPaymentModel(S3Model):
 # =============================================================================
 # Tracking Models
 # =============================================================================
-class BRCaseEventModel(S3Model):
+class BRCaseEventModel(DataModel):
     """
         Model for checkpoint-style tracking of beneficiaries
     """
@@ -2486,7 +2490,7 @@ class BRCaseEventModel(S3Model):
 # =============================================================================
 # Case Documentation Models
 # =============================================================================
-class BRLanguageModel(S3Model):
+class BRLanguageModel(DataModel):
     """
         Model to document language options for communication
         with a beneficiary
@@ -2521,7 +2525,7 @@ class BRLanguageModel(S3Model):
                           Field("quality",
                                 default = "N",
                                 label = T("Quality/Mode"),
-                                represent = S3Represent(options=dict(lang_quality_opts)),
+                                represent = represent_option(dict(lang_quality_opts)),
                                 requires = IS_IN_SET(lang_quality_opts,
                                                      sort = False,
                                                      zero = None,
@@ -2537,21 +2541,21 @@ class BRLanguageModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
     # -------------------------------------------------------------------------
     @staticmethod
     def defaults():
         """ Safe defaults for names in case the module is disabled """
 
-        return {}
+        return None
 
 # =============================================================================
-class BRLegalStatusModel(S3Model):
+class BRLegalStatusModel(DataModel):
     pass
 
 # =============================================================================
-class BRServiceContactModel(S3Model):
+class BRServiceContactModel(DataModel):
     """ Model to track external service contacts of beneficiaries """
 
     names = ("br_service_contact",
@@ -2680,17 +2684,17 @@ class BRServiceContactModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
     # -------------------------------------------------------------------------
     @staticmethod
     def defaults():
         """ Safe defaults for names in case the module is disabled """
 
-        return {}
+        return None
 
 # =============================================================================
-class BRNotesModel(S3Model):
+class BRNotesModel(DataModel):
     """ Simple Journal for Case Files """
 
     names = ("br_note",
@@ -2810,14 +2814,14 @@ class BRNotesModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass names back to global scope (s3.*)
         #
-        return {}
+        return None
 
 # =============================================================================
-class BRReferralModel(S3Model):
+class BRReferralModel(DataModel):
     pass
 
 # =============================================================================
-class BRVulnerabilityModel(S3Model):
+class BRVulnerabilityModel(DataModel):
     pass
 
 # =============================================================================
@@ -2840,9 +2844,10 @@ class br_AssistanceThemeRepresent(S3Represent):
         """
             Custom rows lookup
 
-            @param key: the key Field
-            @param values: the values
-            @param fields: unused (retained for API compatibility)
+            Args:
+                key: the key Field
+                values: the values
+                fields: unused (retained for API compatibility)
         """
 
         table = self.table
@@ -2877,7 +2882,8 @@ class br_AssistanceThemeRepresent(S3Represent):
         """
             Represent a row
 
-            @param row: the Row
+            Args:
+                row: the Row
         """
 
         T = current.T
@@ -2914,9 +2920,8 @@ class br_AssistanceMeasureRepresent(S3Represent):
 
     def __init__(self, show_hr=True, show_link=True):
         """
-            Constructor
-
-            @param show_hr: include the staff member name
+            Args:
+                show_hr: include the staff member name
         """
 
         super(br_AssistanceMeasureRepresent, self).__init__(
@@ -2931,9 +2936,10 @@ class br_AssistanceMeasureRepresent(S3Represent):
         """
             Custom rows lookup
 
-            @param key: the key Field
-            @param values: the values
-            @param fields: list of fields to look up (unused)
+            Args:
+                key: the key Field
+                values: the values
+                fields: list of fields to look up (unused)
         """
 
         show_hr = self.show_hr
@@ -2965,7 +2971,8 @@ class br_AssistanceMeasureRepresent(S3Represent):
         """
             Represent a row
 
-            @param row: the Row
+            Args:
+                row: the Row
         """
 
         table = self.table
@@ -2986,9 +2993,10 @@ class br_AssistanceMeasureRepresent(S3Represent):
         """
             Represent a (key, value) as hypertext link
 
-            @param k: the key (br_assistance_measure.id)
-            @param v: the representation of the key
-            @param row: the row with this key
+            Args:
+                k: the key (br_assistance_measure.id)
+                v: the representation of the key
+                row: the row with this key
         """
 
         try:
@@ -3010,10 +3018,9 @@ class br_AssistanceMeasureThemeRepresent(S3Represent):
 
     def __init__(self, paragraph=False, details=False):
         """
-            Constructor
-
-            @param paragraph: render as HTML paragraph
-            @param details: include details in paragraph
+            Args:
+                paragraph: render as HTML paragraph
+                details: include details in paragraph
         """
 
         super(br_AssistanceMeasureThemeRepresent, self).__init__(
@@ -3028,9 +3035,10 @@ class br_AssistanceMeasureThemeRepresent(S3Represent):
         """
             Custom rows lookup
 
-            @param key: the key Field
-            @param values: the values
-            @param fields: list of fields to look up (unused)
+            Args:
+                key: the key Field
+                values: the values
+                fields: list of fields to look up (unused)
         """
 
         count = len(values)
@@ -3059,7 +3067,8 @@ class br_AssistanceMeasureThemeRepresent(S3Represent):
         """
             Represent a row
 
-            @param row: the Row
+            Args:
+                row: the Row
         """
 
         table = self.table
@@ -3084,10 +3093,11 @@ class br_AssistanceMeasureThemeRepresent(S3Represent):
         """
             Render list-type representations from bulk()-results.
 
-            @param value: the list
-            @param labels: the labels as returned from bulk()
-            @param show_link: render references as links, should
-                              be the same as used with bulk()
+            Args:
+                value: the list
+                labels: the labels as returned from bulk()
+                show_link: render references as links, should
+                           be the same as used with bulk()
         """
 
         if self.paragraph:
@@ -3111,15 +3121,14 @@ class br_CaseActivityRepresent(S3Represent):
                  linkto=None,
                  ):
         """
-            Constructor
-
-            @param show_as: alternative representations:
-                            "beneficiary"|"need"|"subject"
-            @param fmt: string format template for person record
-            @param show_date: include the activity date in the representation
-            @param show_link: show representation as clickable link
-            @param linkto: URL for the link, using "[id]" as placeholder
-                           for the record ID
+            Args:
+                show_as: alternative representations:
+                         "beneficiary"|"need"|"subject"
+                fmt: string format template for person record
+                show_date: include the activity date in the representation
+                show_link: show representation as clickable link
+                linkto: URL for the link, using "[id]" as placeholder
+                        for the record ID
         """
 
         super(br_CaseActivityRepresent, self).__init__(
@@ -3145,9 +3154,10 @@ class br_CaseActivityRepresent(S3Represent):
         """
             Custom rows lookup
 
-            @param key: the key Field
-            @param values: the values
-            @param fields: unused (retained for API compatibility)
+            Args:
+                key: the key Field
+                values: the values
+                fields: unused (retained for API compatibility)
         """
 
         table = self.table
@@ -3205,7 +3215,8 @@ class br_CaseActivityRepresent(S3Represent):
         """
             Represent a row
 
-            @param row: the Row
+            Args:
+                row: the Row
         """
 
         show_as = self.show_as
@@ -3236,9 +3247,10 @@ class br_CaseActivityRepresent(S3Represent):
         """
             Represent a (key, value) as hypertext link
 
-            @param k: the key (br_case_activity.id)
-            @param v: the representation of the key
-            @param row: the row with this key
+            Args:
+                k: the key (br_case_activity.id)
+                v: the representation of the key
+                row: the row with this key
         """
 
         # Allow override
@@ -3274,16 +3286,15 @@ class br_DocEntityRepresent(S3Represent):
                  show_link=False,
                  ):
         """
-            Constructor
-
-            @param case_label: label for cases (default: "Case")
-            @param case_group_label: label for case groups (default: "Case Group")
-            @param activity_label: label for case activities
-                                   (default: "Activity")
-            @param use_need: use need if available instead of subject
-            @param use_sector: use sector if available instead of
-                               activity label
-            @param show_link: show representation as clickable link
+            Args:
+                case_label: label for cases (default: "Case")
+                case_group_label: label for case groups (default: "Case Group")
+                activity_label: label for case activities
+                                (default: "Activity")
+                use_need: use need if available instead of subject
+                use_sector: use sector if available instead of
+                            activity label
+                show_link: show representation as clickable link
         """
 
         super(br_DocEntityRepresent, self).__init__(lookup = "doc_entity",
@@ -3315,9 +3326,10 @@ class br_DocEntityRepresent(S3Represent):
         """
             Custom rows lookup
 
-            @param key: the key Field
-            @param values: the values
-            @param fields: unused (retained for API compatibility)
+            Args:
+                key: the key Field
+                values: the values
+                fields: unused (retained for API compatibility)
         """
 
         db = current.db
@@ -3421,7 +3433,8 @@ class br_DocEntityRepresent(S3Represent):
         """
             Represent a row
 
-            @param row: the Row
+            Args:
+                row: the Row
         """
 
         reprstr = self.default
@@ -3484,9 +3497,10 @@ class br_DocEntityRepresent(S3Represent):
         """
             Represent a (key, value) as hypertext link
 
-            @param k: the key (doc_entity.doc_id)
-            @param v: the representation of the key
-            @param row: the row with this key
+            Args:
+                k: the key (doc_entity.doc_id)
+                v: the representation of the key
+                row: the row with this key
         """
 
         link = v
@@ -3518,9 +3532,10 @@ def br_compact_code(record_id, length=3, alphabet=None, prefix=""):
     """
         Generate a compact code for a record ID
 
-        @param record_id: the record ID
-        @param length: the minimum length of the code
-        @param alphabet: the alphabet to use
+        Args:
+            record_id: the record ID
+            length: the minimum length of the code
+            alphabet: the alphabet to use
     """
 
     if not alphabet:
@@ -3547,7 +3562,8 @@ def br_case_read_orgs():
     """
         Check if the user has read access to cases of more than one org
 
-        @returns: tuple (multiple_orgs, org_ids)
+        Returns:
+            tuple (multiple_orgs, org_ids)
     """
 
     realms = current.auth.permission.permitted_realms("br_case", "read")
@@ -3569,7 +3585,8 @@ def br_case_default_org():
     """
         Determine the default organisation for new cases
 
-        @returns: tuple (default_org, multiple_orgs)
+        Returns:
+            tuple (default_org, multiple_orgs)
     """
 
     settings = current.deployment_settings
@@ -3608,9 +3625,11 @@ def br_case_root_org(person_id):
     """
         Get the root organisation managing a case
 
-        @param person_id: the person record ID
+        Args:
+            person_id: the person record ID
 
-        @returns: the root organisation record ID
+        Returns:
+            the root organisation record ID
     """
 
     db = current.db
@@ -3639,7 +3658,8 @@ def br_case_default_status():
     """
         Helper to get/set the default status for case records
 
-        @return: the default status_id
+        Returns:
+            the default status_id
     """
 
     s3db = current.s3db
@@ -3667,9 +3687,11 @@ def br_case_status_filter_opts(closed=None):
     """
         Get filter options for case status, ordered by workflow position
 
-        @return: OrderedDict of options
+        Returns:
+            OrderedDict of options
 
-        @note: set sort=False for filter widget to retain this order
+        Note:
+            set sort=False for filter widget to retain this order
     """
 
     table = current.s3db.br_case_status
@@ -3695,9 +3717,11 @@ def br_case_activity_default_status(closing=False):
     """
         Helper to get/set the default status for case activities
 
-        @param closing: return the default closure status
+        Args:
+            closing: return the default closure status
 
-        @return: the default status_id
+        Returns:
+            the default status_id
     """
 
     s3db = current.s3db
@@ -3737,8 +3761,9 @@ def br_org_assistance_themes(organisation_id):
         - otherwise, the themes matching the org's sectors (if themes are
           sector-specific) and need types (if themes are need-specific)
 
-        @param organisation_id: the organisation ID, usually the case root
-                                organisation
+        Args:
+            organisation_id: the organisation ID, usually the case root
+                             organisation
     """
 
     db = current.db
@@ -3791,7 +3816,8 @@ def br_assistance_default_status():
     """
         Set the default status for assistance measures
 
-        @returns: the default status ID
+        Returns:
+            the default status ID
     """
 
     db = current.db
@@ -3822,10 +3848,12 @@ def br_assistance_status_colors(resource, selector):
     """
         Get colors for assistance statuses (organizer)
 
-        @param resource: the S3Resource the caller is looking at
-        @param selector: the Field selector (usually "status_id")
+        Args:
+            resource: the CRUDResource the caller is looking at
+            selector: the Field selector (usually "status_id")
 
-        @returns: a dict with colors {field_value: "#RRGGBB", ...}
+        Returns:
+            a dict with colors {field_value: "#RRGGBB", ...}
     """
 
     table = current.s3db.br_assistance_status
@@ -3843,7 +3871,8 @@ def br_household_size(group_id):
         case groups. To be called onaccept of pr_group_membership if automatic
         household size is enabled
 
-        @param group_id: the group_id of the case group (group_type == 7)
+        Args:
+            group_id: the group_id of the case group (group_type == 7)
     """
 
     db = current.db
@@ -3904,12 +3933,13 @@ def br_group_membership_onaccept(membership, group, group_id, person_id):
     """
         Module-specific extensions for pr_group_membership_onaccept
 
-        @param membership: the pr_group_membership record
-                           - required fields: id, deleted, group_head
-        @param group: the pr_group record
-                      - required fields: id, group_type
-        @param group_id: the group ID (if membership was deleted)
-        @param person_id: the person ID (if membership was deleted)
+        Args:
+            membership: the pr_group_membership record
+                        - required fields: id, deleted, group_head
+            group: the pr_group record
+                   - required fields: id, group_type
+            group_id: the group ID (if membership was deleted)
+            person_id: the person ID (if membership was deleted)
     """
 
     db = current.db
@@ -3989,7 +4019,7 @@ def br_group_membership_onaccept(membership, group, group_id, person_id):
                 row = db(query).select(ctable.id, limitby=(0, 1)).first()
                 if not row:
                     # Customise case resource
-                    r = S3Request("br", "case", current.request)
+                    r = CRUDRequest("br", "case", current.request)
                     r.customise_resource("br_case")
 
                     # Get the default case status from database
@@ -4160,7 +4190,8 @@ def br_terminology():
     """
         Terminology-sensitive labels for BR (other than CRUD strings)
 
-        @returns: Messages instance
+        Returns:
+            Messages instance
     """
 
     labels = current.response.s3.br_labels
@@ -4217,9 +4248,11 @@ def br_crud_strings(tablename):
     """
         Terminology-sensitive CRUD strings for BR
 
-        @param tablename: the table name
+        Args:
+            tablename: the table name
 
-        @returns: Storage of CRUD strings
+        Returns:
+            Storage of CRUD strings
     """
 
     T = current.T

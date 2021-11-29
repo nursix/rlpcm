@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
+"""
+    Simple Generic Location Tracking System
 
-""" Simple Generic Location Tracking System
-
-    @copyright: 2011-2021 (c) Sahana Software Foundation
-    @license: MIT
+    Copyright: 2011-2021 (c) Sahana Software Foundation
 
     Permission is hereby granted, free of charge, to any person
     obtaining a copy of this software and associated documentation
@@ -34,11 +32,12 @@ __all__ = ("S3CheckInMethod",
 from gluon import current, HTTP, FORM, INPUT, LABEL, TABLE
 from gluon.storage import Storage
 
-from ..service import S3Method
 from ..tools import S3Trackable
 
+from .base import CRUDMethod
+
 # =============================================================================
-class S3CheckInMethod(S3Method):
+class S3CheckInMethod(CRUDMethod):
     """
         Custom Method to allow a trackable resource to check-in
     """
@@ -49,8 +48,9 @@ class S3CheckInMethod(S3Method):
         """
             Apply method.
 
-            @param r: the S3Request
-            @param attr: controller options for this request
+            Args:
+                r: the CRUDRequest
+                attr: controller options for this request
         """
 
         if r.representation == "html":
@@ -156,7 +156,7 @@ class S3CheckInMethod(S3Method):
             raise HTTP(415, current.ERROR.BAD_FORMAT)
 
 # =============================================================================
-class S3CheckOutMethod(S3Method):
+class S3CheckOutMethod(CRUDMethod):
     """
         Custom Method to allow a trackable resource to check-out
     """
@@ -167,8 +167,9 @@ class S3CheckOutMethod(S3Method):
         """
             Apply method.
 
-            @param r: the S3Request
-            @param attr: controller options for this request
+            Args:
+                r: the CRUDRequest
+                attr: controller options for this request
         """
 
         if r.representation == "html":
